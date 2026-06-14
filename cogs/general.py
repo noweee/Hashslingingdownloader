@@ -5,12 +5,10 @@ import sys
 import discord
 from discord.ext import commands
 import subprocess
+from helpers.config import load_config
+from helpers.filesystem import clean_temp_dir
 
-if not os.path.isfile("config.json"):
-    sys.exit("'config.json' not found! Please add it and try again.")
-else:
-    with open("config.json") as file:
-        config = json.load(file)
+config = load_config()
 
 download_folder = config['bot_folder']
 uname = platform.uname()
@@ -110,7 +108,7 @@ class general(commands.Cog, name="general"):
         """
         Cleans temp folder of downloads, "usually" resolves Region Error. Only Admin/Dev can use this command!
         """
-        subprocess.run(["rm", "-r", f"{download_folder}download/Temp"])
+        clean_temp_dir(download_folder)
         embed = discord.Embed(
             title="👍 Success!",
             description=f"🗑️ Temp folder wiped.",
@@ -118,5 +116,5 @@ class general(commands.Cog, name="general"):
         )
         await context.reply(embed=embed)
 
-def setup(bot):
-    bot.add_cog(general(bot))
+async def setup(bot):
+    await bot.add_cog(general(bot))

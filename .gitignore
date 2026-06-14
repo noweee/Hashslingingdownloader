@@ -1,3 +1,7 @@
 # ignore nonsense bs
 cogs/__pycache__/
 .vscode/
+.venv/
+.env
+__pycache__/
+last_upload.json

@@ -4,12 +4,9 @@ import sys
 
 import discord
 from discord.ext import commands
+from helpers.config import load_config
 
-if not os.path.isfile("config.json"):
-    sys.exit("'config.json' not found! Please add it and try again.")
-else:
-    with open("config.json") as file:
-        config = json.load(file)
+config = load_config()
 
 
 class Help(commands.Cog, name="help"):
@@ -34,5 +31,5 @@ class Help(commands.Cog, name="help"):
         await context.reply(embed=embed)
 
 
-def setup(bot):
-    bot.add_cog(Help(bot))
+async def setup(bot):
+    await bot.add_cog(Help(bot))

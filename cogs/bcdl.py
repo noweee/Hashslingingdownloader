@@ -12,13 +12,12 @@ import base64
 from datetime import timedelta
 from time import gmtime, strftime
 import hashlib
+from helpers.config import channel_mention, load_config
+from helpers.discord_permissions import set_request_channel_locked
+from helpers.filesystem import clean_temp_dir, ensure_temp_dir
 
 # Only if you want to use variables that are in the config.json file.
-if not os.path.isfile("config.json"):
-    sys.exit("'config.json' not found! Please add it and try again.")
-else:
-    with open("config.json") as file:
-        config = json.load(file)
+config = load_config()
 
 download_folder = config['bot_folder']
 request_channel = config['request_channel']
@@ -43,7 +42,7 @@ class BCDL(commands.Cog, name="bcdl"):
         req_channel = self.bot.get_channel(request_channel)
         up_channel = self.bot.get_channel(upload_channel)
 
-        rclone_drives = ["gd", "gd", "gd"]
+        rclone_drives = config["rclone_drives"]
         random_rclone_drives = random.choice(rclone_drives)
 
         if ctx.channel.id == request_channel:
@@ -76,14 +75,14 @@ class BCDL(commands.Cog, name="bcdl"):
             elif not link.find("https") != -1:
                 await ctx.reply(f"Please add `https://` to your link, {ctx.author.mention}.")
             else:
-                await req_channel.set_permissions(ctx.guild.default_role, send_messages=False)
+                await set_request_channel_locked(req_channel, ctx.guild.default_role, True)
                 await ctx.message.add_reaction('✅')
-                await ctx.reply(f"{ctx.author.mention}, please wait while your request is being downloaded. You will receive a ping in <#974568872835448842> with your download link once it's done.\nTo other requestors, this channel will be **unlocked after completing the request.**")            
+                await ctx.reply(f"{ctx.author.mention}, please wait while your request is being downloaded. You will receive a ping in {channel_mention(upload_channel)} with your download link once it's done.\nTo other requestors, this channel will be **unlocked after completing the request.**")            
 
                 download_start_time = time.time()
                 try:
                     await ctx.message.add_reaction('📁')
-                    subprocess.run(["mkdir", f"{download_folder}download/Temp"])
+                    ensure_temp_dir(download_folder)
                     with open('bandcamp-dl_log.txt', 'wb') as f:
                         await ctx.message.add_reaction('📥')
                         process = subprocess.Popen(["campdown", f'{link}'], cwd=f"{download_folder}download/Temp", stdout=subprocess.PIPE)
@@ -134,11 +133,11 @@ class BCDL(commands.Cog, name="bcdl"):
                     upload_end_time = time.time() - upload_start_time                            
                     upload_time = timedelta(seconds=round(upload_end_time))
 
-                    subprocess.run(["rm", "-rf", f'{download_folder}download/Temp'])              
+                    clean_temp_dir(download_folder)              
 
                     all_done = discord.Embed(
-                        name="Request complete",
-                        description="**Request Complete.**\nHelp me pay my electric bills, if you find me useful! Check <#1079251617926365306> for details!",
+                        title="Request complete",
+                        description=f"**Request Complete.**\nCheck {channel_mention(config.get('supporter_channel'))} for support details.",
                         color=0x20e84f
                     )                
 
@@ -174,10 +173,10 @@ class BCDL(commands.Cog, name="bcdl"):
                     all_done.set_footer(text=f"Requested by {ctx.message.author}\nHoushou Marine - a SoundBytes PH's music downloader") 
 
                     await up_channel.send(embed=all_done)
-                    await up_channel.send(f"{ctx.author.mention}, decode the link below in <#1087346196626034759>.")
+                    await up_channel.send(f"{ctx.author.mention}, decode the link below in {channel_mention(config.get('decode_channel'))}.")
                     await up_channel.send(gdrive_b64)
                     await ctx.message.add_reaction('👍')
-                    await req_channel.send("Request complete! Download link sent on <#974568872835448842>!\nWaiting for command...")
+                    await req_channel.send(f"Request complete! Download link sent on {channel_mention(upload_channel)}!\nWaiting for command...")
 
                     # Uncomment lines below if you want to send dm to author
                     # -----------------------------------------------------------------------------------------------------------------
@@ -193,17 +192,17 @@ class BCDL(commands.Cog, name="bcdl"):
                     # time.sleep(1)
                     # subprocess.run(["rm", "-rf", f'{download_folder}qr-codes/gen'])    
                     # # await up_channel.send(f"{ctx.author.mention}")
-                    await req_channel.set_permissions(ctx.guild.default_role, send_messages=True)
+                    await set_request_channel_locked(req_channel, ctx.guild.default_role, False)
                     # await ctx.send("Done.")
                     # # await up_channel(config["request_channel"]).send("Channel unlocked, awaiting command.")
                     # -----------------------------------------------------------------------------------------------------------------
                 except:
                     await ctx.message.add_reaction('❌')
                     await ctx.send("The following Song/Album isn't available to download. Possible reasons are:\n- Song/Album is geo-locked.\n- Bot cannot fetch link data, try again.")
-                    await req_channel.set_permissions(ctx.guild.default_role, send_messages=True)
+                    await set_request_channel_locked(req_channel, ctx.guild.default_role, False)
 
         else:
             await ctx.reply(f"This command can only be used in <#{request_channel}>")                                         
         
-def setup(bot):
-    bot.add_cog(BCDL(bot))
+async def setup(bot):
+    await bot.add_cog(BCDL(bot))

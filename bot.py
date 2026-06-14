@@ -1,55 +1,37 @@
 import json
 import os
 import platform
-from colorama import Fore, Back, Style
-import random
-from random import randint
-import sys
 from datetime import datetime
-from discord_webhook import DiscordWebhook, DiscordEmbed
+
 import discord
-from discord.ext import commands, tasks
-from discord.ext.commands import Bot
+from colorama import Fore, Style
+from discord.ext import commands
 
-if not os.path.isfile("config.json"):
-    sys.exit("'config.json' not found! Please add it and try again.")
-else:
-    with open("config.json") as file:
-        config = json.load(file)
-
-"""	
-Setup bot intents (events restrictions)
-For more information about intents, please go to the following websites:
-https://discordpy.readthedocs.io/en/latest/intents.html
-https://discordpy.readthedocs.io/en/latest/intents.html#privileged-intents
+from helpers.config import channel_mention, load_config
 
 
-Default Intents:
-intents.messages = True
-intents.reactions = True
-intents.guilds = True
-intents.emojis = True
-intents.bans = True
-intents.guild_typing = False
-intents.typing = False
-intents.dm_messages = False
-intents.dm_reactions = False
-intents.dm_typing = False
-intents.guild_messages = True
-intents.guild_reactions = True
-intents.integrations = True
-intents.invites = True
-intents.voice_states = False
-intents.webhooks = False
-
-Privileged Intents (Needs to be enabled on dev page), please use them only if you need them:
-intents.presences = True
-intents.members = True
-"""
+config = load_config()
 
 intents = discord.Intents.default()
+intents.message_content = True
 
-bot = Bot(command_prefix=config["bot_prefix"], intents=intents)  
+
+class MarineBot(commands.Bot):
+    async def setup_hook(self):
+        for file in os.listdir("./cogs"):
+            if file.endswith(".py"):
+                extension = file[:-3]
+                try:
+                    await self.load_extension(f"cogs.{extension}")
+                    print(f"Loaded extension '{extension}'")
+                except Exception as e:
+                    exception = f"{type(e).__name__}: {e}"
+                    print(f"Failed to load extension {extension}\n{exception}")
+
+
+bot = MarineBot(command_prefix=config["bot_prefix"], intents=intents)
+bot.remove_command("help")
+
 
 @bot.event
 async def on_ready():
@@ -60,20 +42,7 @@ async def on_ready():
     print(f"Running on: {platform.system()} {platform.release()} ({os.name})")
     print(Fore.RED + "-------------------")
     print(Style.RESET_ALL)
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="I'm broke | h!help"))
-
-bot.remove_command("help")
-
-if __name__ == "__main__":
-    for file in os.listdir("./cogs"):
-        if file.endswith(".py"):
-            extension = file[:-3]
-            try:
-                bot.load_extension(f"cogs.{extension}")
-                print(f"Loaded extension '{extension}'")
-            except Exception as e:
-                exception = f"{type(e).__name__}: {e}"
-                print(f"Failed to load extension {extension}\n{exception}")
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="h!help"))
 
 
 @bot.event
@@ -86,22 +55,28 @@ async def on_message(message):
         return
     await bot.process_commands(message)
 
+
 @bot.event
 async def on_command_completion(ctx):
-    fullCommandName = ctx.command.qualified_name
-    split = fullCommandName.split(" ")
-    executedCommand = str(split[0])
+    executed_command = ctx.command.qualified_name.split(" ")[0]
     print(
-        Fore.YELLOW + f"Executed {executedCommand} command in {ctx.guild.name} (ID: {ctx.message.guild.id}) by {ctx.message.author} (ID: {ctx.message.author.id})")
+        Fore.YELLOW
+        + f"Executed {executed_command} command in {ctx.guild.name} "
+        + f"(ID: {ctx.message.guild.id}) by {ctx.message.author} "
+        + f"(ID: {ctx.message.author.id})"
+    )
     print(Style.RESET_ALL)
 
-    botwebhook = DiscordWebhook(url='https://discordapp.com/api/webhooks/1021787265451696220/fuck_scammers_and_webcrawlers_rot_in_hell_and_suck_my_dick_lmao', rate_limit_retry=True,)
-    timenow = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    embed = DiscordEmbed(title=f'Bot Action Log', description=f"✅ Executed `{executedCommand}` command by <@{ctx.message.author.id}> at `{timenow} UTC -8`", color='bf40bf')
-    embed.set_thumbnail(url='https://cdn.discordapp.com/avatars/804650950026330172/ed49e0e623675c87c90ccbae537b7ffa.png')
-    embed.set_footer(text="I'm just logging script activities for easier troubleshooting, do i look creepy?")
-    botwebhook.add_embed(embed)
-    botwebhook.execute()
+    log_channel = bot.get_channel(config.get("log_channel"))
+    if log_channel:
+        timenow = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        embed = discord.Embed(
+            title="Bot Action Log",
+            description=f"Executed `{executed_command}` command by <@{ctx.message.author.id}> at `{timenow}`",
+            color=0xBF40BF,
+        )
+        await log_channel.send(embed=embed)
+
 
 @bot.event
 async def on_command_error(context, error):
@@ -112,40 +87,55 @@ async def on_command_error(context, error):
         embed = discord.Embed(
             title="Hey, please slow down! You're stressing me out!",
             description=f"You can use this command again in {f'{round(hours)} hours' if round(hours) > 0 else ''} {f'{round(minutes)} minutes' if round(minutes) > 0 else ''} {f'{round(seconds)} seconds' if round(seconds) > 0 else ''}.",
-            color=0xE02B2B
+            color=0xE02B2B,
         )
         await context.send(embed=embed)
     elif isinstance(error, commands.MissingPermissions):
         embed = discord.Embed(
             title="Error!",
-            description="You are missing the permission `" + ", ".join(
-                error.missing_perms) + "` to execute this command!",
-            color=0xE02B2B
+            description="You are missing the permission `" + ", ".join(error.missing_perms) + "` to execute this command!",
+            color=0xE02B2B,
         )
+        await context.reply(embed=embed)
     elif isinstance(error, commands.MissingRequiredArgument):
         embed = discord.Embed(
             title="Wait a minute...",
             description=str(error).capitalize(),
-            color=0xE02B2B
+            color=0xE02B2B,
         )
-        embed.set_footer(text=f"Trying to use Qobuz? Refer to #music-dl-faq channel for audio quality/format selection.")
+        embed.set_footer(text="Trying to use Qobuz? Check your configured music download info channel.")
         await context.reply(embed=embed)
     elif isinstance(error, commands.MaxConcurrencyReached):
         embed = discord.Embed(
             title="Whoops! Not too fast!",
-            description="Please wait for the previous downloads to finish!\nTry Again later.",
-            color=0xE02B2B
+            description="Please wait for the previous downloads to finish.\nTry again later.",
+            color=0xE02B2B,
         )
         embed.set_footer(text=f"Requested by {context.message.author}.")
-        await context.send(embed=embed)     
+        await context.send(embed=embed)
     elif isinstance(error, commands.MissingAnyRole):
         embed = discord.Embed(
             title="Sorry!",
-            description="Only donators can use this command! Refer to <#1079251617926365306> channel for more info!",
-            color=0xE02B2B
+            description=f"Only allowed roles can use this command. Refer to {channel_mention(config.get('supporter_channel'))} for more info.",
+            color=0xE02B2B,
         )
-        embed.set_footer(text=f"Running this bot on my home's local machine 24/7, help me pay my electric bills please UwU")
         await context.send(embed=embed)
-    raise error
+    elif isinstance(error, commands.MissingRole):
+        embed = discord.Embed(
+            title="Sorry!",
+            description="You do not have the required role to use this command.",
+            color=0xE02B2B,
+        )
+        await context.send(embed=embed)
+    elif isinstance(error, commands.CommandInvokeError) and isinstance(error.original, discord.Forbidden):
+        embed = discord.Embed(
+            title="Missing bot permission",
+            description="Discord refused that action. Move the bot role above the affected channel/roles, or give it the needed permission.",
+            color=0xE02B2B,
+        )
+        await context.send(embed=embed)
+    else:
+        raise error
+
 
 bot.run(config["token"])
