@@ -1,7 +1,14 @@
 # ignore nonsense bs
+.codex/
 cogs/__pycache__/
 .vscode/
 .venv/
 .env
 __pycache__/
+*.log
+*_log.txt
+rclone_logs.txt
 last_upload.json
+daily_counters.json
+upload_registry.json
+download/*/

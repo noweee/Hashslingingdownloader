@@ -1,7 +1,8 @@
 import asyncio
 import json
+from urllib.error import HTTPError
 from urllib.parse import urlencode
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 
 def _shorten_sync(config, url):
@@ -11,8 +12,17 @@ def _shorten_sync(config, url):
 
     api_url = config.get("shrinkearn_api_url", "https://shrinkearn.com/api")
     query = urlencode({"api": api_key, "url": url})
-    with urlopen(f"{api_url}?{query}", timeout=30) as response:
-        data = response.read().decode("utf-8").strip()
+    request = Request(
+        f"{api_url}?{query}",
+        headers={"User-Agent": "Mozilla/5.0 HoushouMarineBot/1.0"},
+    )
+    try:
+        with urlopen(request, timeout=30) as response:
+            data = response.read().decode("utf-8").strip()
+    except HTTPError as exc:
+        if exc.code == 403:
+            raise RuntimeError("ShrinkEarn returned 403 Forbidden. Check SHRINKEARN_API_KEY and your ShrinkEarn API access.") from exc
+        raise
 
     try:
         payload = json.loads(data)

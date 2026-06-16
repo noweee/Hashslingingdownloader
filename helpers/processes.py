@@ -4,11 +4,12 @@ import sys
 from helpers.progress import extract_percent
 
 
-async def run_logged_command(command, log_path, progress_callback=None):
+async def run_logged_command(command, log_path, progress_callback=None, env=None):
     process = await asyncio.create_subprocess_exec(
         *command,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
+        env=env,
     )
 
     with open(log_path, "wb") as log_file:

@@ -44,16 +44,15 @@ Open the config.json file and edit it.
 
 * Put the channel id in 6 and 7 of config.json
 
-## About KHInsider Downloader
-
-If khi_dl_arm or khi_dl_linux_x64 binary isnt present in resources folder, download it on [this](https://github.com/Sorrow446/KHInsider-Downloader) repository
-
 ## All set?
 If all set, run:
 
 ```python3 bot.py```
 
-* When you run the h!dl <link> command for the first time , check your terminal and follow the steps to login to tidal/qobuz.
+For the Windows old-laptop/server setup, use [SETUP_OLD_LAPTOP.md](SETUP_OLD_LAPTOP.md).
+
+* The bot now accepts Spotify and Qobuz links only. Spotify uses SpotDL. Qobuz uses Streamrip/QDL.
+* When you run the h!dl <qobuz-link> command for the first time, check your terminal and follow the steps to login to Qobuz.
 
 Your token is saved so you don't have to do it everytime.
 

@@ -2,6 +2,12 @@ import re
 import time
 
 
+def progress_bar(percent, width=20):
+    percent = max(0, min(100, int(percent)))
+    filled = round((percent / 100) * width)
+    return f"[{'#' * filled}{'-' * (width - filled)}] {percent}%"
+
+
 class ProgressMessage:
     def __init__(self, message):
         self.message = message
@@ -25,7 +31,7 @@ class ProgressMessage:
         if not force and last is not None and percent - last < 5 and percent < 100:
             return
         self.last_percent[label] = percent
-        await self.set(f"{label}: {percent}%", force=force or percent >= 100)
+        await self.set(f"{label}\n`{progress_bar(percent)}`", force=force or percent >= 100)
 
 
 def extract_percent(text):
