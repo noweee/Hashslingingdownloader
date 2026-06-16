@@ -82,6 +82,32 @@ def command_for(link, temp_path, qobuz_quality, qobuz_search=None):
     return ["rip", "--quality", str(qobuz_quality), "url", link], "rip_log.txt", "Downloading...", streamrip_env
 
 
+async def download_searches(searches, temp_path, qobuz_quality, log_prefix, progress):
+    total = len(searches)
+    failed = []
+    streamrip_env = make_request_streamrip_env(temp_path, qobuz_quality)
+    for index, (media_type, query, _song_count) in enumerate(searches, start=1):
+        await progress.percent("Downloading", ((index - 1) / total) * 100, force=True)
+        returncode = await run_logged_command(
+            [
+                "rip",
+                "--quality",
+                str(qobuz_quality),
+                "search",
+                "--first",
+                "qobuz",
+                media_type,
+                query,
+            ],
+            f"{log_prefix}rip_{index:03d}_log.txt",
+            env=streamrip_env,
+        )
+        if returncode != 0:
+            failed.append(query)
+        await progress.percent("Downloading", (index / total) * 100, force=True)
+    return failed
+
+
 async def ask_choice(bot, channel, author, prompt, choices, timeout=45):
     choice_text = ", ".join(f"`{choice}`" for choice in choices)
     notice = await channel.send(f"{author.mention} {prompt}\nReply with {choice_text}.")
@@ -201,6 +227,8 @@ class Music(commands.Cog, name="music"):
                     quality_label, qobuz_quality = "Dolby Atmos / highest available when supported", 4
 
             qobuz_search = None
+            qobuz_searches = None
+            known_song_count = None
             source_note = None
             if kind == "spotify" and qobuz_quality > 1:
                 prep = ProgressMessage(await result_channel.send("Preparing request...\n`[--------------------] 0%`"))
@@ -208,7 +236,13 @@ class Music(commands.Cog, name="music"):
                 await prep.percent("Preparing request", 100, force=True)
                 if qobuz_search:
                     media_type, query, _known_song_count = qobuz_search
-                    source_note = f"Request matched as **{media_type}: {query}**."
+                    known_song_count = _known_song_count
+                    if media_type == "tracks":
+                        qobuz_searches = query
+                        source_note = f"Request matched as **{len(qobuz_searches)} item(s)**."
+                        qobuz_search = None
+                    else:
+                        source_note = f"Request matched as **{media_type}: {query}**."
                     await result_channel.send(f"{ctx.author.mention} {source_note}")
                 else:
                     choice = await ask_choice(
@@ -221,6 +255,12 @@ class Music(commands.Cog, name="music"):
                     if choice == "cancel":
                         return
                     quality_label, qobuz_quality = "Standard quality", 1
+            if known_song_count and tier.max_batch_tracks is not None and known_song_count > tier.max_batch_tracks:
+                await result_channel.send(
+                    f"{ctx.author.mention}, your **{tier.label}** allows up to **{tier.max_batch_tracks}** item(s) per request. "
+                    f"This request contains **{known_song_count}** item(s), so it will not be downloaded."
+                )
+                return
             await result_channel.send(
                 f"Accepted as **{tier.label}**. Quality target: **{quality_label}**.\n"
                 f"{describe_tier(tier)}"
@@ -230,17 +270,25 @@ class Music(commands.Cog, name="music"):
             random_rclone_drive = random.choice(config["rclone_drives"])
 
             download_start_time = time.time()
-            command, log_name, download_status, process_env = command_for(link, temp_path, qobuz_quality, qobuz_search)
-            await progress.set(download_status, force=True)
-            await progress.percent("Downloading", 0, force=True)
-            returncode = await run_logged_command(
-                command,
-                f"{log_prefix}{log_name}",
-                env=process_env,
-                progress_callback=lambda percent: progress.percent("Downloading", percent),
-            )
-            if returncode != 0:
-                raise RuntimeError(f"downloader failed with exit code {returncode}")
+            if qobuz_searches:
+                await progress.set("Downloading...", force=True)
+                failed_searches = await download_searches(qobuz_searches, temp_path, qobuz_quality, log_prefix, progress)
+                if failed_searches:
+                    await result_channel.send(
+                        f"{len(failed_searches)} item(s) could not be prepared and were skipped."
+                    )
+            else:
+                command, log_name, download_status, process_env = command_for(link, temp_path, qobuz_quality, qobuz_search)
+                await progress.set(download_status, force=True)
+                await progress.percent("Downloading", 0, force=True)
+                returncode = await run_logged_command(
+                    command,
+                    f"{log_prefix}{log_name}",
+                    env=process_env,
+                    progress_callback=lambda percent: progress.percent("Downloading", percent),
+                )
+                if returncode != 0:
+                    raise RuntimeError(f"downloader failed with exit code {returncode}")
             download_time = timedelta(seconds=round(time.time() - download_start_time))
             detected_quality = detect_audio_quality(temp_path)
             song_count = count_audio_files(temp_path)

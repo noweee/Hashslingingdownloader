@@ -31,6 +31,26 @@ def spotify_query_from_items(items, media_type):
     return list_name
 
 
+def _first_text(value):
+    if isinstance(value, list):
+        return next((str(item).strip() for item in value if str(item).strip()), None)
+    if value is None:
+        return None
+    value = str(value).strip()
+    return value or None
+
+
+def spotify_track_queries(items):
+    queries = []
+    for item in items:
+        artist = _first_text(item.get("artist")) or _first_text(item.get("artists")) or _first_text(item.get("album_artist"))
+        title = _first_text(item.get("name")) or _first_text(item.get("title"))
+        query = " - ".join(part for part in [artist, title] if part)
+        if query:
+            queries.append(("track", query, 1))
+    return queries
+
+
 async def spotify_to_qobuz_search(link, temp_path, log_path):
     metadata_path = Path(temp_path) / "spotify_metadata.spotdl"
     returncode = await run_logged_command(
@@ -44,6 +64,11 @@ async def spotify_to_qobuz_search(link, temp_path, log_path):
     except json.JSONDecodeError:
         return None
     media_type = spotify_media_type(link)
+    if media_type == "playlist":
+        searches = spotify_track_queries(items)
+        if not searches:
+            return None
+        return "tracks", searches, max(1, len(searches))
     query = spotify_query_from_items(items, media_type)
     if not query:
         return None
