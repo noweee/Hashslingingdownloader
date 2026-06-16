@@ -1,61 +1,40 @@
-![alt text](https://github.com/Yuuhei/Houshou-Marine-SBPH-Bot/blob/main/marine-banner.gif?raw=true)
+# Hash Slinging Downloader
 
-# Houshou Marine SBPH Bot
-A bot for SBPH coded by Aspidiske/Yuuhei and thepanglossian
+Hash Slinging Downloader is a private Discord download assistant for the Hash Slinging Downloader Community.
 
-You must use any Linux distro here, Windows isn't a linux distro.
+The bot accepts download requests in Discord, prepares the package, uploads it to configured storage, and sends the requester a private delivery link. Runtime secrets, account sessions, logs, and generated downloads stay local and should not be committed.
 
-I used Debian for this when it's still alive on Buccaneer Hub, so change debian specific commands here like `apt` to your distro
+## Windows Server Setup
 
-If ur gonna plan to use another [OS](https://templeos.org/), you'll gonna have a bad time porting commands.
+For the full old-laptop/server setup, follow:
 
-## Package Dependencies
+[SETUP_OLD_LAPTOP.md](SETUP_OLD_LAPTOP.md)
 
-Install the following packages before proceeding.
+## Quick Start
 
-```sudo apt install python3 pip libjpeg-dev zlib1g-dev python3-dev libffi-dev libxml2-dev libxslt-dev```
-then add Python to your path.
+```powershell
+Copy-Item .env.example .env
+notepad .env
+.\run-bot.ps1
+```
 
-Run these to install additional important stuff: 
+`run-bot.ps1` will create the Python virtual environment if needed, install Python packages, load `.env`, and start the bot.
 
-```pip3 install streamrip --upgrade```
+## Local Files Not For GitHub
 
-Install [RClone](https://rclone.org/)
+Keep these on the machine only:
 
-Install ```7zip``` or ``p7zip``
+- `.env`
+- `.venv/`
+- `download/`
+- local account/session config files
+- log files
+- daily counters and upload registry files
 
- Run ```pip install -r requirements.txt```
+## Discord Command
 
-## Setting Up 
+```text
+h!dl <link>
+```
 
-Run ```rip config --open``` , it will show you the file location of streamrip's config. Open it with a text editor and change
-
-```folder = "/home/<user>/StreamripDownloads"``` to ```folder = "Your bot folder/download/Temp/"```
-
-Set ```[database]
-enabled = true``` to **false**.
-
-Read [this](https://rclone.org/commands/rclone_config/) to setup rclone.
-
-Change rclone remote to your rclone remote name on cogs/*.py from `rclone_drives = ["gd", "gd", "gd"]` to your remote name.
-
-Open the config.json file and edit it.
-* config.json download location should have a ```/``` at the end.
-
-* Put the channel id in 6 and 7 of config.json
-
-## All set?
-If all set, run:
-
-```python3 bot.py```
-
-For the Windows old-laptop/server setup, use [SETUP_OLD_LAPTOP.md](SETUP_OLD_LAPTOP.md).
-
-* The bot now accepts Spotify and Qobuz links only. Spotify uses SpotDL. Qobuz uses Streamrip/QDL.
-* When you run the h!dl <qobuz-link> command for the first time, check your terminal and follow the steps to login to Qobuz.
-
-Your token is saved so you don't have to do it everytime.
-
-# Others
-
-Check out [Kaidoku](https://github.com/Yuuhei/Kaidoku), the bot often partnered with this bot!
+Quality, limits, and delivery method are decided from the requester's Discord roles.

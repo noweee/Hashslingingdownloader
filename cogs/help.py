@@ -16,12 +16,12 @@ class Help(commands.Cog, name="help"):
     @commands.command(name="help")
     async def help(self, context):
         """
-        List all commands Houshou Marine supports.
+        List all commands Hash Slinging Downloader supports.
         """
         prefix = config["bot_prefix"]
         if not isinstance(prefix, str):
             prefix = prefix[0]
-        embed = discord.Embed(title="Help", description="Houshou Marine's available commands:", color=0x42F56C)
+        embed = discord.Embed(title="Help", description="Hash Slinging Downloader commands:", color=0x2ECC71)
         for cog_name, cog in self.bot.cogs.items():
             commands = [command for command in cog.get_commands() if not command.hidden]
             if commands:

@@ -69,7 +69,7 @@ async def maybe_delete_oldest_if_near_full(channel, remote, threshold=0.95):
     item = oldest_upload()
     if not item:
         return
-    await channel.send(f"Drive is near capacity. Deleting oldest tracked file `{item.get('display_name', item['remote_file'])}` early.")
+    await channel.send(f"Storage is near capacity. Deleting oldest tracked file `{item.get('display_name', item['remote_file'])}` early.")
     if await delete_remote_file(item["remote_file"]):
         await channel.send(f"Deleted `{item.get('display_name', item['remote_file'])}` to free space.")
 

@@ -1,120 +1,74 @@
-import json
 import os
 import platform
-import sys
+
 import discord
 from discord.ext import commands
-import subprocess
+
 from helpers.config import load_config
 from helpers.filesystem import clean_temp_dir
 
+
 config = load_config()
+download_folder = config["bot_folder"]
 
-download_folder = config['bot_folder']
-uname = platform.uname()
 
-class general(commands.Cog, name="general"):
+class General(commands.Cog, name="general"):
     def __init__(self, bot):
         self.bot = bot
 
     @commands.command(name="info", aliases=["botinfo"])
     async def info(self, context):
         """
-        Get some useful (or not) information about Houshou Marine.
+        Get information about Hash Slinging Downloader.
         """
         embed = discord.Embed(
-            description="Houshou Marine - a SoundBytes PH's music downloader.",
-            color=0x42F56C
+            title="Hash Slinging Downloader",
+            description="Private download assistant for the Hash Slinging Downloader Community.",
+            color=0x2ECC71,
         )
-        embed.set_thumbnail(
-            url="https://cdn.discordapp.com/avatars/804650950026330172/ed49e0e623675c87c90ccbae537b7ffa.png"
-        )
-        embed.set_author(
-            name="❓ Bot Information"
-        )
-        embed.add_field(
-            name="Bot Owner and Dev:",
-            value="<@380793772088229888>",
-            inline=True
-        )
-        embed.add_field(
-            name="Helper:",
-            value="thepanglossian#0091",
-            inline=True
-        )
-        embed.add_field(
-            name="Horni Team and Donators:",
-            value="<@369686912568655875>, for providing Tidal Subs\n \n<@264355366551289856>, for providing the server (Dell Optiplex 3020M)\n \n<@305998511894167552>, for providing Unlimited Google Drive cloud storage\n \nAnd all <@&979375720432287775>s, thank you for donating!",
-            inline=True
-	)
-        embed.add_field(
-            name="Python Version:",
-            value=f"{platform.python_version()}",
-            inline=True
-        )
-        embed.add_field(
-            name="Prefix:",
-            value=f"{config['bot_prefix']}",
-            inline=False
-        )
-        embed.add_field(
-            name="Running on:",
-            value=f"Debian GNU/Linux 11 Headless {platform.system()} {platform.release()} ({os.name})",
-            inline=False
-        )
-        embed.add_field(
-            name="Server Specs:",
-            value=f"Processor: Intel i3-4160T @ 3.10GHz, 2C/4T\nTotal Physical RAM: 6GB (4G+2G DDR3 SODIMM) @ 1333MHz\nStorage: 240GB SATA SSD",
-            inline=False
-        )
-        embed.set_image(
-            url="https://cdn.discordapp.com/attachments/899688146466385961/1034460067346530436/marine-banner.gif"
-        )
-        embed.set_footer(
-            text=f"Requested by {context.message.author}"
-        )
+        embed.add_field(name="Python", value=f"{platform.python_version()}", inline=True)
+        embed.add_field(name="Prefix", value=f"{config['bot_prefix']}", inline=True)
+        embed.add_field(name="Host", value=f"{platform.system()} {platform.release()} ({os.name})", inline=False)
+        embed.set_footer(text=f"Requested by {context.message.author}")
         await context.reply(embed=embed)
 
     @commands.command(name="ping")
     async def ping(self, context):
         """
-        Check if the bot is alive and still sailing the pirate seas.
+        Check if the bot is online.
         """
         embed = discord.Embed(
-            title="🏓 Pong!",
+            title="Pong",
             description=f"The bot latency is {round(self.bot.latency * 1000)}ms.",
-            color=0x42F56C
+            color=0x2ECC71,
         )
         await context.reply(embed=embed)
 
     @commands.command(name="invite", aliases=["support", "supportserver"])
     async def invite(self, context):
         """
-        Get the invite link of SBPH Server.
+        Get the community invite link.
         """
         embed = discord.Embed(
-            description=f"Join the server for the bot by clicking these links:\n Vanity URL: https://discord.gg/soundbytesph\nNormal Invite Url (if vanity URL isn't working): https://discord.gg/mj2jbz3RWw",
-            color=0xD75BF4
+            description="Ask a staff member for the current Hash Slinging Downloader Community invite.",
+            color=0x2ECC71,
         )
-        try:
-            await context.author.send(embed=embed)
-            await context.reply("I sent you a private message, pls respond")
-        except discord.Forbidden:
-            await context.reply(embed=embed)
+        await context.reply(embed=embed)
 
     @commands.command(name="clean")
     @commands.has_any_role("Dev and Maintainer")
     async def clean(self, context):
         """
-        Cleans temp folder of downloads, "usually" resolves Region Error. Only Admin/Dev can use this command!
+        Cleans temporary request files. Only Admin/Dev can use this command.
         """
         clean_temp_dir(download_folder)
         embed = discord.Embed(
-            title="👍 Success!",
-            description=f"🗑️ Temp folder wiped.",
-            color=0x42F56C
+            title="Cleaned",
+            description="Temporary request files were removed.",
+            color=0x2ECC71,
         )
         await context.reply(embed=embed)
 
+
 async def setup(bot):
-    await bot.add_cog(general(bot))
+    await bot.add_cog(General(bot))

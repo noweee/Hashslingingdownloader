@@ -151,8 +151,7 @@ class Music(commands.Cog, name="music"):
             kind = service_kind(link)
             if kind == "unsupported":
                 await result_channel.send(
-                    f"{ctx.author.mention}, this bot now only accepts **Spotify** and **Qobuz** links. "
-                    "Bandcamp, KHInsider, Tidal, Deezer, Apple Music, YouTube, and SoundCloud links are disabled."
+                    f"{ctx.author.mention}, this source is not supported here. Please send a supported download request."
                 )
                 return
             content = content_kind(link)
@@ -209,19 +208,19 @@ class Music(commands.Cog, name="music"):
                 await prep.percent("Preparing request", 100, force=True)
                 if qobuz_search:
                     media_type, query, _known_song_count = qobuz_search
-                    source_note = f"Spotify link matched by searching Qobuz for **{media_type}: {query}**."
+                    source_note = f"Request matched as **{media_type}: {query}**."
                     await result_channel.send(f"{ctx.author.mention} {source_note}")
                 else:
                     choice = await ask_choice(
                         self.bot,
                         result_channel,
                         ctx.author,
-                        f"I could not convert this Spotify link to a Qobuz search. Your **{tier.label}** supports **{tier.quality_label}** from higher-quality source links. Proceed with Spotify lossy or cancel?",
+                        "I could not prepare this at your highest available quality. Proceed with standard quality or cancel?",
                         {"proceed", "cancel"},
                     )
                     if choice == "cancel":
                         return
-                    quality_label, qobuz_quality = "Spotify lossy", 1
+                    quality_label, qobuz_quality = "Standard quality", 1
             await result_channel.send(
                 f"Accepted as **{tier.label}**. Quality target: **{quality_label}**.\n"
                 f"{describe_tier(tier)}"
@@ -311,25 +310,24 @@ class Music(commands.Cog, name="music"):
             track_upload(remote_file, zip_file, ctx.author.id, result_channel.id)
 
             all_done = discord.Embed(
-                title="Request complete",
-                description=f"{tier.label} delivery: {'ShrinkEarn ad link' if tier.ad_supported else 'clean direct link'}.",
-                color=0x20E84F,
+                title="Delivery Ready",
+                description=f"{ctx.author.mention}, your package is ready.",
+                color=0x2ECC71,
             )
-            all_done.add_field(name="Name", value=zip_file, inline=False)
-            all_done.add_field(name="Songs Counted", value=str(song_count), inline=False)
-            all_done.add_field(name="Requested Quality", value=quality_label, inline=False)
-            all_done.add_field(name="Detected File Quality", value=detected_quality, inline=False)
-            all_done.add_field(name="Download Link", value=output_link, inline=False)
-            all_done.add_field(name="Download Time", value=download_time, inline=False)
-            all_done.add_field(name="Zip Time", value=zipping_time, inline=False)
-            all_done.add_field(name="Upload Time", value=upload_time, inline=False)
+            all_done.add_field(name="Package", value=zip_file, inline=False)
+            all_done.add_field(name="Items", value=str(song_count), inline=True)
+            all_done.add_field(name="Access", value="Standard" if tier.ad_supported else "Direct", inline=True)
+            all_done.add_field(name="Link", value=output_link, inline=False)
+            all_done.add_field(name="Processing", value=str(download_time), inline=True)
+            all_done.add_field(name="Packaging", value=str(zipping_time), inline=True)
+            all_done.add_field(name="Delivery", value=str(upload_time), inline=True)
             all_done.add_field(
-                name="Retention",
-                value="Deleted after 2 hours, sooner if Drive is near the limit, or immediately if you start a new request.",
+                name="Availability",
+                value="Deleted after 2 hours, sooner if storage is near the limit, or immediately if you start a new request.",
                 inline=False,
             )
-            all_done.add_field(name="SHA-256 Checksum", value=checksum, inline=False)
-            all_done.set_footer(text=f"Requested by {ctx.message.author}")
+            all_done.add_field(name="Checksum", value=checksum, inline=False)
+            all_done.set_footer(text="Hash Slinging Downloader")
 
             cleanup_request_context(temp_path)
 
@@ -337,7 +335,7 @@ class Music(commands.Cog, name="music"):
             await result_channel.send(f"{ctx.author.mention} {output_link}")
             await result_channel.send(
                 "Copy the link now. This private download channel will be deleted after 2 hours, "
-                "sooner if Drive is near the limit, or immediately if you start a new request."
+                "sooner if storage is near the limit, or immediately if you start a new request."
             )
             await progress.set("Complete.", force=True)
             self.bot.loop.create_task(schedule_delete_after(self.bot, remote_file, zip_file, ctx.author.id, result_channel.id))

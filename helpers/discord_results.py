@@ -9,7 +9,7 @@ def channel_safe_name(value):
 
 
 def result_channel_topic(user_id):
-    return f"SBPH private download channel for user {user_id}"
+    return f"Hash Slinging Downloader private channel for user {user_id}"
 
 
 def is_user_result_channel(channel, user_id):
@@ -60,7 +60,7 @@ async def create_user_result_channel(ctx, upload_target, request_id):
         )
         return channel, (
             f"Request accepted. Private result channel: {channel.mention}\n"
-            "This channel will be automatically deleted after 2 hours, sooner if Drive is near the limit, "
+            "This channel will be automatically deleted after 2 hours, sooner if storage is near the limit, "
             "or immediately if you start a new request."
         )
     except Exception:

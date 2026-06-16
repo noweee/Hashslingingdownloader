@@ -1,6 +1,6 @@
-# Old Laptop Server Setup
+# Hash Slinging Downloader Server Setup
 
-This guide is for moving the bot to another Windows computer so your main PC can be turned off.
+This guide moves Hash Slinging Downloader to another Windows computer so your main PC can be turned off.
 
 ## What Goes To GitHub
 
@@ -16,10 +16,10 @@ Do not commit these local/private files:
 - `last_upload.json`
 - `*_log.txt`
 - `rclone_logs.txt`
-- any rclone config file
-- any Streamrip/Qobuz config containing account tokens
+- any storage auth config
+- any account/session config containing tokens
 
-The repository is now set up to ignore those.
+The repository is configured to ignore those files.
 
 ## Required Apps On The Old Laptop
 
@@ -33,22 +33,21 @@ Install these before cloning the bot:
    - During install, check `Add python.exe to PATH`.
 
 3. FFmpeg
-   - Required by SpotDL and audio tools.
-   - Easy install with winget:
+   - Required for audio processing.
 
 ```powershell
 winget install Gyan.FFmpeg
 ```
 
 4. rclone
-   - Required for Google Drive upload/delete/link creation.
+   - Required for storage upload, link creation, and automatic deletion.
 
 ```powershell
 winget install Rclone.Rclone
 ```
 
 5. 7-Zip
-   - Useful for archives and compatibility with the existing bot environment.
+   - Useful for archive handling and server maintenance.
 
 ```powershell
 winget install 7zip.7zip
@@ -74,23 +73,13 @@ rclone version
 
 ## Create Your GitHub Repository
 
-Your current `origin` points to the original public project, not your personal copy. Create your own private GitHub repository first.
+Create a private GitHub repository under your own account.
 
-Recommended: make it private because this bot is tied to your server setup.
-
-Then from this computer, set your repository as the remote:
+Then from this computer, set your private repository as the remote:
 
 ```powershell
 git remote set-url origin https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
-git add .
-git commit -m "Prepare portable Discord downloader server setup"
 git push -u origin main
-```
-
-If your branch is named `master`, use this instead:
-
-```powershell
-git push -u origin master
 ```
 
 ## Clone On The Old Laptop
@@ -99,8 +88,8 @@ On the old laptop:
 
 ```powershell
 cd $env:USERPROFILE\Documents
-git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git "SBPH Steal"
-cd "SBPH Steal"
+git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git "Hash Slinging Downloader"
+cd "Hash Slinging Downloader"
 ```
 
 ## Create The Local .env File
@@ -122,7 +111,7 @@ DISCORD_UPLOAD_CHANNEL=your_upload_channel_id
 DISCORD_LOG_CHANNEL=your_log_channel_id
 DISCORD_SUPPORTER_CHANNEL=your_supporter_info_channel_id
 DISCORD_DECODE_CHANNEL=your_decode_info_channel_id
-BOT_FOLDER=C:\Users\YOUR_WINDOWS_USER\Documents\SBPH Steal
+BOT_FOLDER=C:\Users\YOUR_WINDOWS_USER\Documents\Hash Slinging Downloader
 RCLONE_DRIVES=gd
 RCLONE_UPLOAD_PATH=
 SHRINKEARN_API_KEY=your_shrinkearn_api_key
@@ -133,9 +122,9 @@ Notes:
 
 - `BOT_FOLDER` should be the full folder where the repo is cloned.
 - Keep `RCLONE_DRIVES=gd` if your rclone remote is named `gd`.
-- Leave `RCLONE_UPLOAD_PATH=` blank if files should upload to the root of that Drive remote.
+- Leave `RCLONE_UPLOAD_PATH=` blank if files should upload to the root of that remote.
 
-## Set Up Google Drive With rclone
+## Set Up Storage With rclone
 
 Run:
 
@@ -147,12 +136,12 @@ Use these choices:
 
 - New remote: `n`
 - Name: `gd`
-- Storage: Google Drive
-- Scope: full Drive access
+- Storage: the cloud storage provider you use for this bot
+- Scope: full storage access
 - Service account file: leave blank
 - Advanced config: no
 - Auto authenticate in browser: yes
-- Shared Drive: usually no, unless you specifically use a Shared Drive
+- Shared/team storage: usually no, unless you specifically use one
 - Keep remote: yes
 
 Test it:
@@ -161,41 +150,19 @@ Test it:
 rclone lsf gd:
 ```
 
-If that lists files or returns without an auth error, rclone is ready.
+If that lists files or returns without an auth error, storage is ready.
 
-## Set Up Qobuz / Streamrip
+## Set Up The Download Account Session
 
-Run:
-
-```powershell
-rip config --open
-```
-
-If that only opens Notepad, that is fine. The config lives at:
-
-```text
-C:\Users\YOUR_WINDOWS_USER\AppData\Roaming\streamrip\config.toml
-```
-
-Make sure Qobuz login/token settings are configured the same way they are on this computer.
+The downloader backend keeps its own account/session file on each Windows user profile. Do not commit that file.
 
 Fastest migration method:
 
-1. On this computer, open:
+1. On this computer, open the working backend config from your Windows user profile.
+2. On the old laptop, open the same backend config path for that Windows user.
+3. Copy only the working account/session settings.
 
-```text
-C:\Users\Admin\AppData\Roaming\streamrip\config.toml
-```
-
-2. On the old laptop, open:
-
-```text
-C:\Users\YOUR_WINDOWS_USER\AppData\Roaming\streamrip\config.toml
-```
-
-3. Copy the Qobuz-related settings from this computer to the old laptop.
-
-Do not commit `config.toml` to GitHub.
+If you prefer a fresh login, start the bot once and follow the terminal login prompts from the backend tool.
 
 ## First Run
 
@@ -218,8 +185,7 @@ When it says the bot is ready, test in Discord:
 
 ```text
 h!ping
-h!dl <spotify-link>
-h!dl <qobuz-link>
+h!dl <link>
 ```
 
 ## Keeping It Running
@@ -248,7 +214,7 @@ powercfg /change hibernate-timeout-ac 0
 When you change the bot on your main PC and push to GitHub, update the old laptop with:
 
 ```powershell
-cd "$env:USERPROFILE\Documents\SBPH Steal"
+cd "$env:USERPROFILE\Documents\Hash Slinging Downloader"
 git pull
 .\run-bot.ps1
 ```
@@ -267,10 +233,10 @@ If `ffmpeg` is missing:
 winget install Gyan.FFmpeg
 ```
 
-If Qobuz fails:
+If downloads fail:
 
-- Check `C:\Users\YOUR_WINDOWS_USER\AppData\Roaming\streamrip\config.toml`.
-- Make sure the old laptop has the same working Qobuz auth settings.
+- Check the backend account/session config on the old laptop.
+- Make sure the old laptop has the same working account/session settings.
 
 If Discord does not respond:
 
@@ -279,7 +245,7 @@ If Discord does not respond:
 - Make sure the bot has permission to view/send/manage channels.
 - Make sure Message Content Intent is enabled in the Discord Developer Portal.
 
-If Google Drive upload/delete fails:
+If storage upload/delete fails:
 
 - Run `rclone lsf gd:`.
 - If it asks for login or fails, run `rclone config` again.

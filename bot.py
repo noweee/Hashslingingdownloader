@@ -16,7 +16,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 
 
-class MarineBot(commands.Bot):
+class HashSlingingDownloaderBot(commands.Bot):
     async def setup_hook(self):
         for file in os.listdir("./cogs"):
             if file.endswith(".py"):
@@ -29,20 +29,20 @@ class MarineBot(commands.Bot):
                     print(f"Failed to load extension {extension}\n{exception}")
 
 
-bot = MarineBot(command_prefix=config["bot_prefix"], intents=intents)
+bot = HashSlingingDownloaderBot(command_prefix=config["bot_prefix"], intents=intents)
 bot.remove_command("help")
 
 
 @bot.event
 async def on_ready():
-    print(Fore.MAGENTA + f"Ahoy, {bot.user.name} here! Script loaded and ready to sail!")
+    print(Fore.MAGENTA + f"{bot.user.name} is online. Hash Slinging Downloader is ready.")
     print(Fore.RED + "-------------------")
     print(Fore.GREEN + f"Discord.py API version: {discord.__version__}")
     print(f"Python version: {platform.python_version()}")
     print(f"Running on: {platform.system()} {platform.release()} ({os.name})")
     print(Fore.RED + "-------------------")
     print(Style.RESET_ALL)
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="h!help"))
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Hash Slinging Downloader"))
 
 
 @bot.event
@@ -103,7 +103,7 @@ async def on_command_error(context, error):
             description=str(error).capitalize(),
             color=0xE02B2B,
         )
-        embed.set_footer(text="Trying to use Qobuz? Check your configured music download info channel.")
+        embed.set_footer(text="Check the download info channel for the correct request format.")
         await context.reply(embed=embed)
     elif isinstance(error, commands.MaxConcurrencyReached):
         embed = discord.Embed(

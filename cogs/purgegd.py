@@ -10,7 +10,7 @@ from helpers.config import load_config
 config = load_config()
 
 
-class SBPHRclone(commands.Cog):
+class StorageAdmin(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
@@ -45,13 +45,10 @@ class SBPHRclone(commands.Cog):
                 + logs
             )
             await ctx.message.add_reaction("✅")
-            await ctx.reply(
-                f"`{remote}:` storage contents purged successfully.\nRClone logs attached below.",
-                file=discord.File(str(log_path)),
-            )
+            await ctx.reply(f"`{remote}:` storage contents purged successfully.", file=discord.File(str(log_path)))
         except subprocess.CalledProcessError as e:
             await ctx.message.add_reaction("❌")
             await ctx.reply(f"Failed to purge storage, reason: {e}")
 
 async def setup(bot):
-    await bot.add_cog(SBPHRclone(bot))
+    await bot.add_cog(StorageAdmin(bot))

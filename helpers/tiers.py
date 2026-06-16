@@ -137,5 +137,5 @@ def requested_quality(quality_name, tier):
 def describe_tier(tier):
     cap = "Unlimited" if tier.daily_cap is None else str(tier.daily_cap)
     batch = "unlimited" if tier.max_batch_tracks is None else str(tier.max_batch_tracks)
-    delivery = "ShrinkEarn link" if tier.ad_supported else "clean direct link"
+    delivery = "standard link" if tier.ad_supported else "direct link"
     return f"{tier.label}: {tier.quality_label}, daily cap {cap}, batch limit {batch}, delivery {delivery}"
