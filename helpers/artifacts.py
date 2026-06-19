@@ -3,6 +3,8 @@ import zipfile
 from pathlib import Path
 import asyncio
 
+from helpers.audio_quality import AUDIO_EXTENSIONS
+
 
 IGNORED_NAMES = {".spotdl-cache", ".streamrip_appdata"}
 
@@ -42,6 +44,10 @@ def downloadable_entries(temp_path):
         and not entry.name.startswith(".")
         and not entry.name.lower().endswith(".zip")
         and not entry.name.lower().endswith(".spotdl")
+        and (
+            (entry.is_file() and entry.suffix.lower() in AUDIO_EXTENSIONS)
+            or entry.is_dir()
+        )
     ]
 
 

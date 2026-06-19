@@ -42,12 +42,24 @@ def _first_text(value):
 
 def spotify_track_queries(items):
     queries = []
-    for item in items:
+    for index, item in enumerate(items, start=1):
         artist = _first_text(item.get("artist")) or _first_text(item.get("artists")) or _first_text(item.get("album_artist"))
         title = _first_text(item.get("name")) or _first_text(item.get("title"))
         query = " - ".join(part for part in [artist, title] if part)
         if query:
-            queries.append(("track", query, 1))
+            position = item.get("playlist_index") or item.get("track_number") or index
+            try:
+                position = int(position)
+            except Exception:
+                position = index
+            queries.append(
+                {
+                    "position": position,
+                    "query": query,
+                    "artist": artist,
+                    "title": title,
+                }
+            )
     return queries
 
 
@@ -68,7 +80,12 @@ async def spotify_to_qobuz_search(link, temp_path, log_path):
         searches = spotify_track_queries(items)
         if not searches:
             return None
-        return "tracks", searches, max(1, len(searches))
+        first = items[0] if items else {}
+        playlist_name = _first_text(first.get("list_name"))
+        playlist_name = playlist_name or _first_text(first.get("playlist"))
+        playlist_name = playlist_name or _first_text(first.get("playlist_title"))
+        playlist_name = playlist_name or _first_text(first.get("title"))
+        return "tracks", searches, max(1, len(searches)), playlist_name
     query = spotify_query_from_items(items, media_type)
     if not query:
         return None

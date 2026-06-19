@@ -6,6 +6,7 @@ from discord.ext import commands
 
 from helpers.config import load_config
 from helpers.filesystem import clean_temp_dir
+from helpers.admin import send_admin_output
 
 
 config = load_config()
@@ -32,31 +33,19 @@ class General(commands.Cog, name="general"):
         embed.set_footer(text=f"Requested by {context.message.author}")
         await context.reply(embed=embed)
 
-    @commands.command(name="ping")
-    async def ping(self, context):
-        """
-        Check if the bot is online.
-        """
-        embed = discord.Embed(
-            title="Pong",
-            description=f"The bot latency is {round(self.bot.latency * 1000)}ms.",
-            color=0x2ECC71,
-        )
-        await context.reply(embed=embed)
-
     @commands.command(name="invite", aliases=["support", "supportserver"])
     async def invite(self, context):
         """
         Get the community invite link.
         """
         embed = discord.Embed(
-            description="Ask a staff member for the current Hash Slinging Downloader Community invite.",
+            description="Join the Hash Slinging Downloader Community:\nhttps://discord.gg/JH6waCG55h",
             color=0x2ECC71,
         )
         await context.reply(embed=embed)
 
-    @commands.command(name="clean")
-    @commands.has_any_role("Dev and Maintainer")
+    @commands.command(name="clean", hidden=True)
+    @commands.has_any_role("Dev and Maintainer", "Founders")
     async def clean(self, context):
         """
         Cleans temporary request files. Only Admin/Dev can use this command.
@@ -67,7 +56,20 @@ class General(commands.Cog, name="general"):
             description="Temporary request files were removed.",
             color=0x2ECC71,
         )
-        await context.reply(embed=embed)
+        await send_admin_output(context, embed=embed)
+
+    @commands.command(name="ping", hidden=True)
+    @commands.has_any_role("Dev and Maintainer", "Founders")
+    async def ping(self, context):
+        """
+        Check if the bot is online.
+        """
+        embed = discord.Embed(
+            title="Pong",
+            description=f"The bot latency is {round(self.bot.latency * 1000)}ms.",
+            color=0x2ECC71,
+        )
+        await send_admin_output(context, embed=embed)
 
 
 async def setup(bot):

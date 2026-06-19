@@ -8,6 +8,7 @@ from colorama import Fore, Style
 from discord.ext import commands
 
 from helpers.config import channel_mention, load_config
+from helpers.admin import get_admin_channel
 
 
 config = load_config()
@@ -43,6 +44,8 @@ async def on_ready():
     print(Fore.RED + "-------------------")
     print(Style.RESET_ALL)
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Hash Slinging Downloader"))
+    for guild in bot.guilds:
+        await get_admin_channel(guild)
 
 
 @bot.event

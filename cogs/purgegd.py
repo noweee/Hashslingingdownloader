@@ -4,6 +4,7 @@ import subprocess
 import discord
 from discord.ext import commands
 
+from helpers.admin import send_admin_output
 from helpers.config import load_config
 
 
@@ -14,11 +15,11 @@ class StorageAdmin(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="purgegd")
-    @commands.has_role("Dev and Maintainer")
+    @commands.command(name="purgegd", hidden=True)
+    @commands.has_any_role("Dev and Maintainer", "Founders")
     async def purge_gd(self, ctx):
         """
-        Purges and cleans the configured RClone remote. Only Admin/Dev can use this command.
+        Purges and cleans the configured storage remote.
         """
         remote = config["rclone_drives"][0]
         try:
@@ -45,10 +46,11 @@ class StorageAdmin(commands.Cog):
                 + logs
             )
             await ctx.message.add_reaction("✅")
-            await ctx.reply(f"`{remote}:` storage contents purged successfully.", file=discord.File(str(log_path)))
+            await send_admin_output(ctx, content=f"`{remote}:` storage contents purged successfully.", file=discord.File(str(log_path)))
         except subprocess.CalledProcessError as e:
             await ctx.message.add_reaction("❌")
-            await ctx.reply(f"Failed to purge storage, reason: {e}")
+            await send_admin_output(ctx, content=f"Failed to purge storage, reason: {e}")
+
 
 async def setup(bot):
     await bot.add_cog(StorageAdmin(bot))
