@@ -220,7 +220,7 @@ class Music(commands.Cog, name="music"):
             return
         try:
             await ctx.message.delete()
-        except discord.Forbidden:
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
             pass
 
         if ctx.author.id in self.active_users:
