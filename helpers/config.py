@@ -39,11 +39,6 @@ def load_config():
         os.getenv("DISCORD_SUPPORTER_CHANNEL", config.get("supporter_channel")),
         "supporter_channel",
     )
-    config["decode_channel"] = _as_int(
-        os.getenv("DISCORD_DECODE_CHANNEL", config.get("decode_channel")),
-        "decode_channel",
-    )
-
     bot_folder = os.getenv("BOT_FOLDER", config.get("bot_folder") or str(Path.cwd()))
     config["bot_folder"] = str(Path(bot_folder).resolve()) + os.sep
 

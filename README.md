@@ -10,6 +10,10 @@ For the full old-laptop/server setup, follow:
 
 [SETUP_OLD_LAPTOP.md](SETUP_OLD_LAPTOP.md)
 
+For a step-by-step guide to push this repo to your own GitHub account, follow:
+
+[PUSH_TO_GITHUB.md](PUSH_TO_GITHUB.md)
+
 ## Quick Start
 
 ```powershell

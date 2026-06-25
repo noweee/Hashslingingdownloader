@@ -4,7 +4,7 @@ import subprocess
 import discord
 from discord.ext import commands
 
-from helpers.admin import send_admin_output
+from helpers.admin import is_admin_channel, send_admin_output
 from helpers.config import load_config
 
 
@@ -21,6 +21,9 @@ class StorageAdmin(commands.Cog):
         """
         Purges and cleans the configured storage remote.
         """
+        if not is_admin_channel(ctx.channel):
+            await ctx.reply("Use this command in #admin-commands-hsd.")
+            return
         remote = config["rclone_drives"][0]
         try:
             await ctx.message.add_reaction("⏳")

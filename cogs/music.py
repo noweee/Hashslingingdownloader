@@ -3,6 +3,7 @@ import hashlib
 import random
 import subprocess
 import time
+import re
 from datetime import timedelta
 
 import discord
@@ -12,18 +13,19 @@ from helpers.audio_quality import detect_audio_quality
 from helpers.audio_quality import count_audio_files, AUDIO_EXTENSIONS
 from helpers.artifacts import artifact_name_from_temp, make_zip_from_temp_with_progress, safe_filename, unique_path
 from helpers.config import channel_mention, load_config
-from helpers.admin import grant_admin_access, send_admin_output
+from helpers.admin import HelpButtonView
 from helpers.daily_counters import reserve
-from helpers.discord_results import create_user_result_channel, delete_channel_later, is_user_result_channel
+from helpers.discord_results import create_private_request_channel, delete_channel_later, is_user_result_channel
 from helpers.processes import run_logged_command
-from helpers.progress import ProgressMessage
-from helpers.retention import maybe_delete_oldest_if_near_full, schedule_delete_after, track_upload
+from helpers.progress import ProgressMessage, build_progress_embed
+from helpers.retention import delete_previous_uploads_for_user, maybe_delete_oldest_if_near_full, schedule_delete_after, track_upload
 from helpers.rclone_paths import remote_path
-from helpers.request_context import cleanup_request_context, create_request_context
+from helpers.request_context import cleanup_request_context, create_request_context, purge_request_logs
 from helpers.shorteners import shorten_link
 from helpers.spotify_bridge import spotify_to_qobuz_search
 from helpers.streamrip_config import make_request_streamrip_env
 from helpers.request_queues import lane_for_tier
+from helpers.request_state import clear_request_state, help_requested
 from helpers.tiers import describe_tier, member_tier, requested_quality
 
 
@@ -66,7 +68,7 @@ def command_for(link, temp_path, qobuz_quality, qobuz_search=None):
             "qobuz",
             media_type,
             query,
-        ], "rip_log.txt", "Downloading...", streamrip_env
+        ], "download_log.txt", "Downloading...", streamrip_env
     if kind == "spotify":
         return [
             "spotdl",
@@ -79,25 +81,56 @@ def command_for(link, temp_path, qobuz_quality, qobuz_search=None):
             "--print-errors",
             "--format",
             "m4a",
-        ], "spotdl_log.txt", "Downloading...", None
+        ], "download_log.txt", "Downloading...", None
     streamrip_env = make_request_streamrip_env(temp_path, qobuz_quality)
-    return ["rip", "--quality", str(qobuz_quality), "url", link], "rip_log.txt", "Downloading...", streamrip_env
+    return ["rip", "--quality", str(qobuz_quality), "url", link], "download_log.txt", "Downloading...", streamrip_env
 
 
-def prefix_new_audio_files(temp_path, seen_files, prefix):
+def rename_new_audio_files(temp_path, seen_files, prefix, artist=None, title=None):
     current_files = []
     for file_path in sorted(temp_path.rglob("*")):
         if file_path.is_file() and file_path.suffix.lower() in AUDIO_EXTENSIONS:
             current_files.append(file_path)
-    for file_path in current_files:
-        resolved = file_path.resolve()
-        if resolved in seen_files:
-            continue
-        target_name = f"{prefix} - {safe_filename(file_path.stem)}{file_path.suffix}"
+    new_files = [file_path for file_path in current_files if file_path.resolve() not in seen_files]
+    base_name_parts = [f"{prefix:03d}" if isinstance(prefix, int) else str(prefix)]
+    if artist:
+        base_name_parts.append(artist)
+    if title:
+        base_name_parts.append(title)
+    for index, file_path in enumerate(new_files, start=1):
+        stem = " - ".join(part for part in base_name_parts if part)
+        if len(new_files) > 1:
+            stem = f"{stem} ({index})"
+        target_name = f"{safe_filename(stem)}{file_path.suffix}"
         file_path.rename(unique_path(file_path.with_name(target_name)))
 
 
-async def download_searches(searches, temp_path, qobuz_quality, log_prefix, progress):
+def strip_source_track_number(name):
+    cleaned = name.strip()
+    while True:
+        updated = re.sub(r"^\s*\d{1,3}\s*[\.\-_)]+\s*", "", cleaned)
+        updated = re.sub(r"^\s*\d{1,3}\s+", "", updated).strip()
+        if updated == cleaned:
+            return cleaned
+        cleaned = updated
+
+
+def downloaded_audio_bytes(temp_path):
+    return sum(
+        file_path.stat().st_size
+        for file_path in temp_path.rglob("*")
+        if file_path.is_file() and file_path.suffix.lower() in AUDIO_EXTENSIONS
+    )
+
+
+def format_speed(byte_count, elapsed_seconds):
+    if elapsed_seconds <= 0:
+        elapsed_seconds = 0.001
+    mib_per_second = byte_count / elapsed_seconds / (1024 * 1024)
+    return f"{mib_per_second:.2f} MiB/s"
+
+
+async def download_searches(searches, temp_path, qobuz_quality, log_path, progress, media_type="track"):
     total = len(searches)
     failed = []
     streamrip_env = make_request_streamrip_env(temp_path, qobuz_quality)
@@ -117,13 +150,23 @@ async def download_searches(searches, temp_path, qobuz_quality, log_prefix, prog
                 media_type,
                 query,
             ],
-            f"{log_prefix}rip_{index:03d}_log.txt",
+            log_path,
             env=streamrip_env,
+            append=True,
+            header=f"[rip] Search {index}/{total}: {query}",
         )
         if returncode != 0:
             failed.append(query)
         else:
-            prefix_new_audio_files(temp_path, seen_files, f"{position:03d}")
+            clean_artist = strip_source_track_number(search.get("artist") or "")
+            clean_title = strip_source_track_number(search.get("title") or "")
+            rename_new_audio_files(
+                temp_path,
+                seen_files,
+                position,
+                artist=clean_artist or None,
+                title=clean_title or None,
+            )
         await progress.percent("Downloading", (index / total) * 100, force=True)
     return failed
 
@@ -186,10 +229,15 @@ class Music(commands.Cog, name="music"):
         self.active_users.add(ctx.author.id)
 
         request_id, temp_path = create_request_context(download_folder)
-        log_prefix = f"{request_id}_"
+        download_log_path = temp_path / "download_log.txt"
         up_channel = self.bot.get_channel(upload_channel) or ctx.channel
-        result_channel, accepted_message = await create_user_result_channel(ctx, up_channel, request_id)
+        result_channel, accepted_message = await create_private_request_channel(ctx, up_channel, request_id)
         await result_channel.send(f"{ctx.author.mention} {accepted_message}")
+        if isinstance(result_channel, discord.TextChannel) and is_user_result_channel(result_channel, ctx.author.id):
+            await result_channel.send(
+                "Need dev help? Use the button below. It can only be used once per request channel.",
+                view=HelpButtonView(result_channel.id, ctx.author.id),
+            )
         progress = None
         queue_lane = None
         queue_ticket = None
@@ -248,14 +296,64 @@ class Music(commands.Cog, name="music"):
                 if choice in {"atmos", "highest"}:
                     quality_label, qobuz_quality = "Dolby Atmos / highest available when supported", 4
 
+            queue_lane = lane_for_tier(tier)
+            queue_status_message = None
+            queue_position = None
+            if queue_lane:
+                async def update_queue_message(position):
+                    if queue_status_message is None:
+                        return
+                    if position <= 1:
+                        note = "You are next."
+                    else:
+                        note = f"Position: {position}."
+                    try:
+                        await queue_status_message.edit(
+                            embed=build_progress_embed(
+                                "In queue",
+                                max(0, min(100, 100 - (position * 10))),
+                                requester=ctx.author.mention,
+                                note=note,
+                            ),
+                            content=None,
+                        )
+                    except Exception:
+                        pass
+
+                queue_ticket, queue_position = await queue_lane.join(on_update=update_queue_message)
+                queue_status_message = await result_channel.send(
+                    embed=build_progress_embed(
+                        "In queue",
+                        max(0, min(100, 100 - (queue_position * 10))),
+                        requester=ctx.author.mention,
+                        note="You are next." if queue_position <= 1 else f"Position: {queue_position}.",
+                    )
+                )
+            await result_channel.send(
+                "Policy note: starting a new request replaces your previous uploaded file in Google Drive to keep storage tidy."
+            )
+            if await delete_previous_uploads_for_user(result_channel, ctx.author.id):
+                await result_channel.send(
+                    f"{ctx.author.mention} Your previous Google Drive upload(s) for earlier request(s) were removed."
+                )
             qobuz_search = None
             qobuz_searches = None
             known_song_count = None
             playlist_title = None
             source_note = None
             if kind == "spotify" and qobuz_quality > 1:
-                prep = ProgressMessage(await result_channel.send("Preparing request...\n`[--------------------] 0%`"))
-                qobuz_search = await spotify_to_qobuz_search(link, temp_path, f"{log_prefix}spotify_metadata_log.txt")
+                prep = ProgressMessage(
+                    await result_channel.send(
+                        embed=build_progress_embed(
+                            "Preparing request",
+                            0,
+                            requester=ctx.author.mention,
+                            note="Matching the source and building the request package.",
+                        )
+                    ),
+                    requester=ctx.author.mention,
+                )
+                qobuz_search = await spotify_to_qobuz_search(link, temp_path, download_log_path)
                 await prep.percent("Preparing request", 100, force=True)
                 if qobuz_search:
                     media_type, query, _known_song_count = qobuz_search[:3]
@@ -285,50 +383,64 @@ class Music(commands.Cog, name="music"):
                     f"This request contains **{known_song_count}** item(s), so it will not be downloaded."
                 )
                 return
-            queue_lane = lane_for_tier(tier)
-            if queue_lane:
-                queue_ticket, queue_position = await queue_lane.join()
-                await result_channel.send(
-                    f"{ctx.author.mention} Queue position: **{queue_position}**. "
-                    "Your request will start when the current request in this lane finishes."
-                )
             await result_channel.send(
                 f"Accepted as **{tier.label}**. Quality target: **{quality_label}**.\n"
                 f"{describe_tier(tier)}"
             )
-            progress = ProgressMessage(await result_channel.send(f"{ctx.author.mention} Queued...\n`[--------------------] 0%`"))
+            progress = ProgressMessage(
+                await result_channel.send(
+                    embed=build_progress_embed(
+                        "Queued",
+                        0,
+                        requester=ctx.author.mention,
+                        note="Waiting for the lane to open, then the download will begin.",
+                    )
+                ),
+                requester=ctx.author.mention,
+            )
 
             random_rclone_drive = random.choice(config["rclone_drives"])
 
             download_start_time = time.time()
             if queue_lane and queue_ticket is not None:
                 await queue_lane.wait_turn(queue_ticket)
+                if queue_status_message:
+                    try:
+                        await queue_status_message.edit(content=f"{ctx.author.mention} You are on queue. You are next.")
+                    except Exception:
+                        pass
             if qobuz_searches:
-                await progress.set("Downloading...", force=True)
+                await progress.set("Downloading", force=True)
                 failed_searches = await download_searches(
                     qobuz_searches,
                     temp_path,
                     qobuz_quality,
-                    log_prefix,
+                    download_log_path,
                     progress,
+                    media_type="track",
                 )
                 if failed_searches:
                     await result_channel.send(
                         f"{len(failed_searches)} item(s) could not be prepared and were skipped."
                     )
             else:
-                command, log_name, download_status, process_env = command_for(link, temp_path, qobuz_quality, qobuz_search)
+                command, _, download_status, process_env = command_for(link, temp_path, qobuz_quality, qobuz_search)
                 await progress.set(download_status, force=True)
                 await progress.percent("Downloading", 0, force=True)
                 returncode = await run_logged_command(
                     command,
-                    f"{log_prefix}{log_name}",
+                    download_log_path,
                     env=process_env,
                     progress_callback=lambda percent: progress.percent("Downloading", percent),
+                    append=True,
+                    header=f"[download] {command[0]}",
                 )
                 if returncode != 0:
                     raise RuntimeError(f"downloader failed with exit code {returncode}")
             download_time = timedelta(seconds=round(time.time() - download_start_time))
+            download_seconds = max(time.time() - download_start_time, 0.001)
+            download_bytes = downloaded_audio_bytes(temp_path)
+            download_speed = format_speed(download_bytes, download_seconds)
             detected_quality = detect_audio_quality(temp_path)
             song_count = count_audio_files(temp_path)
             if song_count < 1:
@@ -378,7 +490,7 @@ class Music(commands.Cog, name="music"):
                     "--drive-chunk-size",
                     "32M",
                 ],
-                f"{log_prefix}upload_log.txt",
+                temp_path / "upload_log.txt",
                 progress_callback=lambda percent: progress.percent("Uploading", percent),
             )
             if returncode != 0:
@@ -405,6 +517,7 @@ class Music(commands.Cog, name="music"):
             all_done.add_field(name="Items", value=str(song_count), inline=True)
             all_done.add_field(name="Access", value="Standard" if tier.ad_supported else "Direct", inline=True)
             all_done.add_field(name="Link", value=output_link, inline=False)
+            all_done.add_field(name="Download Speed", value=download_speed, inline=True)
             all_done.add_field(name="Processing", value=str(download_time), inline=True)
             all_done.add_field(name="Packaging", value=str(zipping_time), inline=True)
             all_done.add_field(name="Delivery", value=str(upload_time), inline=True)
@@ -424,8 +537,21 @@ class Music(commands.Cog, name="music"):
                 "Copy the link now. This private download channel will be deleted after 2 hours, "
                 "sooner if storage is near the limit, or immediately if you start a new request."
             )
-            await result_channel.send("If you need help, use `h!helpme` in this channel and the admin team will be invited.")
-            await progress.set("Complete.", force=True)
+            await result_channel.send("Need dev help? Use the button in this channel. It can only be used once.")
+            log_channel = self.bot.get_channel(config.get("log_channel"))
+            if log_channel:
+                log_embed = discord.Embed(
+                    title="Download throughput",
+                    description=f"{ctx.author.mention} request throughput report.",
+                    color=0x5865F2,
+                )
+                log_embed.add_field(name="Tier", value=tier.label, inline=True)
+                log_embed.add_field(name="Songs", value=str(song_count), inline=True)
+                log_embed.add_field(name="Download Speed", value=download_speed, inline=True)
+                log_embed.add_field(name="Download Time", value=str(download_time), inline=True)
+                log_embed.add_field(name="Channel", value=result_channel.mention, inline=False)
+                await log_channel.send(embed=log_embed)
+                await progress.set("Complete", force=True)
             self.bot.loop.create_task(schedule_delete_after(self.bot, remote_file, zip_file, ctx.author.id, result_channel.id))
             if isinstance(result_channel, discord.TextChannel) and is_user_result_channel(result_channel, ctx.author.id):
                 self.bot.loop.create_task(delete_channel_later(result_channel))
@@ -439,26 +565,21 @@ class Music(commands.Cog, name="music"):
         finally:
             if queue_lane and queue_ticket is not None:
                 await queue_lane.leave(queue_ticket)
+            if not help_requested(result_channel.id):
+                purge_request_logs(temp_path)
             cleanup_request_context(temp_path)
+            clear_request_state(result_channel.id)
             self.active_users.discard(ctx.author.id)
 
     @commands.command(name="helpme", hidden=True)
     async def helpme(self, ctx):
         """
-        Invite admins into your private request channel.
+        Legacy help command fallback.
         """
         if not is_user_result_channel(ctx.channel, ctx.author.id):
             await ctx.reply("Use this inside your private request channel.")
             return
-        granted = await grant_admin_access(ctx.channel)
-        if granted:
-            await ctx.reply("Admin access has been enabled for this channel.")
-            await send_admin_output(
-                ctx,
-                content=f"Help requested in {ctx.channel.mention} by <@{ctx.author.id}>.",
-            )
-        else:
-            await ctx.reply("I could not grant admin access to this channel.")
+        await ctx.reply("Use the help button in this channel. It can only be used once.")
 
 
 async def setup(bot):

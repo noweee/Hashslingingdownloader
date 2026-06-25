@@ -43,3 +43,15 @@ def oldest_upload():
     if not items:
         return None
     return sorted(items, key=lambda item: item.get("created_at", 0))[0]
+
+
+def uploads_for_user(user_id):
+    return [item for item in _load() if item.get("user_id") == user_id and item.get("remote_file")]
+
+
+def remove_uploads_for_user(user_id):
+    items = _load()
+    kept = [item for item in items if item.get("user_id") != user_id]
+    removed = [item for item in items if item.get("user_id") == user_id and item.get("remote_file")]
+    _save(kept)
+    return removed

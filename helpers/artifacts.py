@@ -108,15 +108,17 @@ def make_zip_from_temp(temp_path, archive_name=None):
     entries = downloadable_entries(temp_path)
     if not entries:
         raise RuntimeError("No downloaded files were found to zip.")
+    files = []
+    for entry in entries:
+        if entry.is_dir():
+            files.extend(file_path for file_path in entry.rglob("*") if file_path.is_file())
+        elif entry.is_file():
+            files.append(entry)
+    files.sort(key=lambda file_path: str(file_path.relative_to(temp_path)).lower())
 
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_STORED) as archive:
-        for entry in entries:
-            if entry.is_dir():
-                for file_path in entry.rglob("*"):
-                    if file_path.is_file():
-                        archive.write(file_path, archive_name_for(temp_path, file_path, archive_name, entries))
-            elif entry.is_file():
-                archive.write(entry, Path(archive_name) / entry.name)
+        for file_path in files:
+            archive.write(file_path, archive_name_for(temp_path, file_path, archive_name, entries))
 
     return zip_path
 
@@ -136,6 +138,7 @@ async def make_zip_from_temp_with_progress(temp_path, archive_name=None, progres
             files.extend(file_path for file_path in entry.rglob("*") if file_path.is_file())
         elif entry.is_file():
             files.append(entry)
+    files.sort(key=lambda file_path: str(file_path.relative_to(temp_path)).lower())
 
     total_bytes = sum(file_path.stat().st_size for file_path in files) or 1
     written_bytes = 0

@@ -42,12 +42,33 @@ def _first_text(value):
 
 def spotify_track_queries(items):
     queries = []
-    for index, item in enumerate(items, start=1):
+    def sort_key(item):
+        position = (
+            item.get("list_position")
+            or item.get("playlist_index")
+            or item.get("playlist_position")
+            or item.get("playlist_track_number")
+            or item.get("track_number")
+            or 0
+        )
+        try:
+            return int(position)
+        except Exception:
+            return 0
+
+    for index, item in enumerate(sorted(items, key=sort_key), start=1):
         artist = _first_text(item.get("artist")) or _first_text(item.get("artists")) or _first_text(item.get("album_artist"))
         title = _first_text(item.get("name")) or _first_text(item.get("title"))
         query = " - ".join(part for part in [artist, title] if part)
         if query:
-            position = item.get("playlist_index") or item.get("track_number") or index
+            position = (
+                item.get("list_position")
+                or item.get("playlist_index")
+                or item.get("playlist_position")
+                or item.get("playlist_track_number")
+                or item.get("track_number")
+                or index
+            )
             try:
                 position = int(position)
             except Exception:
@@ -68,6 +89,8 @@ async def spotify_to_qobuz_search(link, temp_path, log_path):
     returncode = await run_logged_command(
         ["spotdl", "save", link, "--save-file", str(metadata_path)],
         log_path,
+        append=True,
+        header=f"[spotify] Saving metadata for {link}",
     )
     if returncode != 0 or not metadata_path.is_file():
         return None

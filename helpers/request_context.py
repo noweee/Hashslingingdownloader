@@ -14,3 +14,14 @@ def cleanup_request_context(temp_path):
     temp_path = Path(temp_path)
     shutil.rmtree(temp_path, ignore_errors=True)
     shutil.rmtree(temp_path.parent / ".streamrip_appdata" / temp_path.name, ignore_errors=True)
+
+
+def purge_request_logs(temp_path):
+    temp_path = Path(temp_path)
+    for pattern in ("*log.txt", "*.spotdl", "*.json"):
+        for path in temp_path.rglob(pattern):
+            try:
+                if path.is_file():
+                    path.unlink()
+            except Exception:
+                pass

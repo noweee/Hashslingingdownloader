@@ -2,7 +2,7 @@ import asyncio
 import re
 import subprocess
 
-from helpers.upload_registry import add_upload, oldest_upload, remove_upload
+from helpers.upload_registry import add_upload, oldest_upload, remove_upload, remove_uploads_for_user
 
 
 async def delete_remote_file(remote_file):
@@ -76,3 +76,18 @@ async def maybe_delete_oldest_if_near_full(channel, remote, threshold=0.95):
 
 def track_upload(remote_file, display_name, user_id, channel_id):
     add_upload(remote_file, display_name, user_id, channel_id)
+
+
+async def delete_previous_uploads_for_user(channel, user_id):
+    previous_items = remove_uploads_for_user(user_id)
+    deleted_any = False
+    for item in previous_items:
+        remote_file = item["remote_file"]
+        display_name = item.get("display_name", remote_file)
+        if channel:
+            await channel.send(f"Removing your previous upload `{display_name}` so your new request can replace it.")
+        if await delete_remote_file(remote_file):
+            deleted_any = True
+            if channel:
+                await channel.send(f"Deleted previous upload `{display_name}` from Google Drive.")
+    return deleted_any or bool(previous_items)

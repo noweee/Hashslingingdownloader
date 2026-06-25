@@ -7,7 +7,6 @@
   "upload_channel": "",
   "log_channel": "",
   "supporter_channel": "",
-  "decode_channel": "",
   "rclone_drives": [
     "gd"
   ],

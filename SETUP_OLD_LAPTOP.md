@@ -110,7 +110,6 @@ DISCORD_REQUEST_CHANNEL=your_request_channel_id
 DISCORD_UPLOAD_CHANNEL=your_upload_channel_id
 DISCORD_LOG_CHANNEL=your_log_channel_id
 DISCORD_SUPPORTER_CHANNEL=your_supporter_info_channel_id
-DISCORD_DECODE_CHANNEL=your_decode_info_channel_id
 BOT_FOLDER=C:\Users\YOUR_WINDOWS_USER\Documents\Hash Slinging Downloader
 RCLONE_DRIVES=gd
 RCLONE_UPLOAD_PATH=

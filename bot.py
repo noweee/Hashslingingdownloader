@@ -15,6 +15,7 @@ config = load_config()
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
 
 
 class HashSlingingDownloaderBot(commands.Bot):
@@ -52,6 +53,16 @@ async def on_ready():
 async def on_message(message):
     if message.author == bot.user or message.author.bot:
         return
+    if message.guild and message.channel.id == config.get("request_channel"):
+        prefix = str(config.get("bot_prefix", "h!")).lower()
+        content = (message.content or "").strip().lower()
+        allowed = content.startswith(f"{prefix}dl")
+        if not allowed:
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            return
     with open("blacklist.json") as file:
         blacklist = json.load(file)
     if message.author.id in blacklist["ids"]:
@@ -106,7 +117,7 @@ async def on_command_error(context, error):
             description=str(error).capitalize(),
             color=0xE02B2B,
         )
-        embed.set_footer(text="Check the download info channel for the correct request format.")
+        embed.set_footer(text="Use the request channel for downloads.")
         await context.reply(embed=embed)
     elif isinstance(error, commands.MaxConcurrencyReached):
         embed = discord.Embed(

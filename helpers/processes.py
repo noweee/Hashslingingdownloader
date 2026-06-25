@@ -4,7 +4,7 @@ import sys
 from helpers.progress import extract_percent
 
 
-async def run_logged_command(command, log_path, progress_callback=None, env=None):
+async def run_logged_command(command, log_path, progress_callback=None, env=None, append=False, header=None):
     process = await asyncio.create_subprocess_exec(
         *command,
         stdout=asyncio.subprocess.PIPE,
@@ -12,7 +12,10 @@ async def run_logged_command(command, log_path, progress_callback=None, env=None
         env=env,
     )
 
-    with open(log_path, "wb") as log_file:
+    mode = "ab" if append else "wb"
+    with open(log_path, mode) as log_file:
+        if header:
+            log_file.write((header.rstrip() + "\n").encode("utf-8"))
         while True:
             line = await process.stdout.readline()
             if not line:
