@@ -20,7 +20,7 @@ from helpers.processes import run_logged_command
 from helpers.progress import ProgressMessage, build_progress_embed
 from helpers.retention import delete_previous_uploads_for_user, maybe_delete_oldest_if_near_full, schedule_delete_after, track_upload
 from helpers.rclone_paths import remote_path
-from helpers.request_context import cleanup_request_context, create_request_context, purge_request_logs
+from helpers.request_context import cleanup_request_context, cleanup_request_context_later, create_request_context, purge_request_logs
 from helpers.shorteners import shorten_link
 from helpers.spotify_bridge import spotify_to_qobuz_search
 from helpers.streamrip_config import make_request_streamrip_env
@@ -241,6 +241,7 @@ class Music(commands.Cog, name="music"):
         progress = None
         queue_lane = None
         queue_ticket = None
+        request_failed = False
 
         try:
             tier = member_tier(ctx.author)
@@ -556,18 +557,25 @@ class Music(commands.Cog, name="music"):
             if isinstance(result_channel, discord.TextChannel) and is_user_result_channel(result_channel, ctx.author.id):
                 self.bot.loop.create_task(delete_channel_later(result_channel))
         except Exception as e:
+            request_failed = True
             if progress:
                 await progress.set(f"Failed: {type(e).__name__}: {e}", force=True)
             await result_channel.send(
                 f"Download failed: `{type(e).__name__}: {e}`\n"
                 "The request could not be completed. Check the bot folder logs on the server machine for details."
             )
+            await result_channel.send(
+                "This failed request folder was kept for debugging and will be cleaned up later."
+            )
         finally:
             if queue_lane and queue_ticket is not None:
                 await queue_lane.leave(queue_ticket)
-            if not help_requested(result_channel.id):
-                purge_request_logs(temp_path)
-            cleanup_request_context(temp_path)
+            if request_failed:
+                self.bot.loop.create_task(cleanup_request_context_later(temp_path))
+            else:
+                if not help_requested(result_channel.id):
+                    purge_request_logs(temp_path)
+                cleanup_request_context(temp_path)
             clear_request_state(result_channel.id)
             self.active_users.discard(ctx.author.id)
 

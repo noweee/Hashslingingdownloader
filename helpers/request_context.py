@@ -1,5 +1,6 @@
 from pathlib import Path
 import shutil
+import asyncio
 from uuid import uuid4
 
 
@@ -25,3 +26,8 @@ def purge_request_logs(temp_path):
                     path.unlink()
             except Exception:
                 pass
+
+
+async def cleanup_request_context_later(temp_path, delay_seconds=86400):
+    await asyncio.sleep(delay_seconds)
+    cleanup_request_context(temp_path)
