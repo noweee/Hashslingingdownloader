@@ -5,6 +5,7 @@ import subprocess
 import time
 import re
 import sys
+from pathlib import Path
 from datetime import timedelta
 
 import discord
@@ -37,6 +38,20 @@ request_channel = config["request_channel"]
 upload_channel = config["upload_channel"]
 
 
+def tool_command(name):
+    binary_dir = Path(sys.executable).resolve().parent
+    suffixes = [""]
+    if sys.platform.startswith("win"):
+        suffixes = [".exe", ".cmd", ".bat", ""]
+    else:
+        suffixes = ["", ".sh"]
+    for suffix in suffixes:
+        candidate = binary_dir / f"{name}{suffix}"
+        if candidate.is_file():
+            return str(candidate)
+    return name
+
+
 def service_kind(link):
     lowered = link.lower()
     if "spotify" in lowered:
@@ -61,7 +76,7 @@ def command_for(link, temp_path, qobuz_quality, qobuz_search=None):
         media_type, query, _song_count = qobuz_search[:3]
         streamrip_env = make_request_streamrip_env(temp_path, qobuz_quality)
         return [
-            "rip",
+            tool_command("rip"),
             "--quality",
             str(qobuz_quality),
             "search",
@@ -86,7 +101,7 @@ def command_for(link, temp_path, qobuz_quality, qobuz_search=None):
             "m4a",
         ], "download_log.txt", "Downloading...", None
     streamrip_env = make_request_streamrip_env(temp_path, qobuz_quality)
-    return ["rip", "--quality", str(qobuz_quality), "url", link], "download_log.txt", "Downloading...", streamrip_env
+    return [tool_command("rip"), "--quality", str(qobuz_quality), "url", link], "download_log.txt", "Downloading...", streamrip_env
 
 
 def rename_new_audio_files(temp_path, seen_files, prefix, artist=None, title=None):
@@ -144,7 +159,7 @@ async def download_searches(searches, temp_path, qobuz_quality, log_path, progre
         await progress.percent("Downloading", ((index - 1) / total) * 100, force=True)
         returncode = await run_logged_command(
             [
-                "rip",
+                tool_command("rip"),
                 "--quality",
                 str(qobuz_quality),
                 "search",

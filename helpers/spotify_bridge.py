@@ -5,6 +5,20 @@ from pathlib import Path
 from helpers.processes import run_logged_command
 
 
+def tool_command(name):
+    binary_dir = Path(sys.executable).resolve().parent
+    suffixes = [""]
+    if sys.platform.startswith("win"):
+        suffixes = [".exe", ".cmd", ".bat", ""]
+    else:
+        suffixes = ["", ".sh"]
+    for suffix in suffixes:
+        candidate = binary_dir / f"{name}{suffix}"
+        if candidate.is_file():
+            return str(candidate)
+    return name
+
+
 def spotify_media_type(link):
     lowered = link.lower()
     if "album" in lowered:
@@ -88,7 +102,7 @@ def spotify_track_queries(items):
 async def spotify_to_qobuz_search(link, temp_path, log_path):
     metadata_path = Path(temp_path) / "spotify_metadata.spotdl"
     returncode = await run_logged_command(
-        [sys.executable, "-m", "spotdl", "save", link, "--save-file", str(metadata_path)],
+        [tool_command("spotdl"), "save", link, "--save-file", str(metadata_path)],
         log_path,
         append=True,
         header=f"[spotify] Saving metadata for {link}",
