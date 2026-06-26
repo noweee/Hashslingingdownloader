@@ -4,6 +4,7 @@ import random
 import subprocess
 import time
 import re
+import sys
 from datetime import timedelta
 
 import discord
@@ -71,6 +72,8 @@ def command_for(link, temp_path, qobuz_quality, qobuz_search=None):
         ], "download_log.txt", "Downloading...", streamrip_env
     if kind == "spotify":
         return [
+            sys.executable,
+            "-m",
             "spotdl",
             "download",
             link,
@@ -434,7 +437,7 @@ class Music(commands.Cog, name="music"):
                     env=process_env,
                     progress_callback=lambda percent: progress.percent("Downloading", percent),
                     append=True,
-                    header=f"[download] {command[0]}",
+                    header="[download] spotdl",
                 )
                 if returncode != 0:
                     raise RuntimeError(f"downloader failed with exit code {returncode}")
@@ -506,7 +509,18 @@ class Music(commands.Cog, name="music"):
                 check=True,
             )
             gdrive_link = link_process.stdout.strip()
-            output_link = await shorten_link(config, gdrive_link) if tier.ad_supported else gdrive_link
+            output_link = gdrive_link
+            if tier.ad_supported:
+                try:
+                    output_link = await shorten_link(config, gdrive_link)
+                except RuntimeError as exc:
+                    output_link = gdrive_link
+                    await result_channel.send(
+                        f"{ctx.author.mention} The short link service is not accepting the current token right now, so the direct drive link was used instead."
+                    )
+                    log_channel = self.bot.get_channel(config.get("log_channel"))
+                    if log_channel:
+                        await log_channel.send(f"Shortener fallback used for {ctx.author.mention}: {exc}")
             track_upload(remote_file, zip_file, ctx.author.id, result_channel.id)
 
             all_done = discord.Embed(

@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 
 from helpers.processes import run_logged_command
@@ -87,7 +88,7 @@ def spotify_track_queries(items):
 async def spotify_to_qobuz_search(link, temp_path, log_path):
     metadata_path = Path(temp_path) / "spotify_metadata.spotdl"
     returncode = await run_logged_command(
-        ["spotdl", "save", link, "--save-file", str(metadata_path)],
+        [sys.executable, "-m", "spotdl", "save", link, "--save-file", str(metadata_path)],
         log_path,
         append=True,
         header=f"[spotify] Saving metadata for {link}",
