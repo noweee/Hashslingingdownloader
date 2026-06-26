@@ -5,7 +5,12 @@ from pathlib import Path
 
 
 def streamrip_config_path():
-    return Path(os.getenv("APPDATA", "")) / "streamrip" / "config.toml"
+    if os.name == "nt":
+        return Path(os.getenv("APPDATA", "")) / "streamrip" / "config.toml"
+    xdg_config = os.getenv("XDG_CONFIG_HOME")
+    if xdg_config:
+        return Path(xdg_config) / "streamrip" / "config.toml"
+    return Path.home() / ".config" / "streamrip" / "config.toml"
 
 
 def set_qobuz_quality(quality):
@@ -47,4 +52,5 @@ def make_request_streamrip_env(temp_path, quality=None):
 
     env = os.environ.copy()
     env["APPDATA"] = str(appdata)
+    env["XDG_CONFIG_HOME"] = str(appdata)
     return env
