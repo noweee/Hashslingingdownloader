@@ -192,8 +192,20 @@ async def download_searches(searches, temp_path, qobuz_quality, log_path, progre
             append=True,
             header=f"[rip] Search {index}/{total}: {query}",
         )
-        if returncode != 0:
-            failed.append(query)
+        new_audio_files = [
+            file_path
+            for file_path in temp_path.rglob("*")
+            if file_path.is_file()
+            and file_path.suffix.lower() in AUDIO_EXTENSIONS
+            and file_path.resolve() not in seen_files
+        ]
+        if returncode != 0 or not new_audio_files:
+            failed.append(
+                {
+                    **search,
+                    "reason": "not found at requested quality" if returncode == 0 else f"download error {returncode}",
+                }
+            )
         else:
             clean_artist = strip_source_track_number(search.get("artist") or "")
             clean_title = strip_source_track_number(search.get("title") or "")
@@ -206,6 +218,73 @@ async def download_searches(searches, temp_path, qobuz_quality, log_path, progre
             )
         await progress.percent("Downloading", (index / total) * 100, force=True)
     return failed
+
+
+async def download_standard_searches(searches, temp_path, log_path, progress):
+    total = len(searches)
+    failed = []
+    for index, search in enumerate(searches, start=1):
+        query = search["query"]
+        position = search["position"]
+        seen_files = {path.resolve() for path in temp_path.rglob("*") if path.is_file()}
+        await progress.percent("Filling unavailable items", ((index - 1) / total) * 100, force=True)
+        returncode = await run_logged_command(
+            [
+                sys.executable,
+                "-m",
+                "spotdl",
+                "download",
+                query,
+                "--output",
+                str(Path(temp_path) / "{artists} - {title}.{output-ext}"),
+                "--preload",
+                "--sponsor-block",
+                "--print-errors",
+                "--log-level",
+                "DEBUG",
+                "--simple-tui",
+                "--format",
+                "m4a",
+                *spotify_api_args(),
+            ],
+            log_path,
+            append=True,
+            header=f"[fallback] Standard quality {index}/{total}: {query}",
+        )
+        new_audio_files = [
+            file_path
+            for file_path in temp_path.rglob("*")
+            if file_path.is_file()
+            and file_path.suffix.lower() in AUDIO_EXTENSIONS
+            and file_path.resolve() not in seen_files
+        ]
+        if returncode != 0 or not new_audio_files:
+            failed.append(search)
+        else:
+            clean_artist = strip_source_track_number(search.get("artist") or "")
+            clean_title = strip_source_track_number(search.get("title") or "")
+            rename_new_audio_files(
+                temp_path,
+                seen_files,
+                position,
+                artist=clean_artist or None,
+                title=clean_title or None,
+            )
+        await progress.percent("Filling unavailable items", (index / total) * 100, force=True)
+    return failed
+
+
+def format_quality_gap_list(searches, target_quality, fallback_quality="Standard quality"):
+    lines = []
+    for search in searches[:20]:
+        position = search.get("position")
+        query = search.get("query") or "Unknown item"
+        reason = search.get("reason") or "not found at requested quality"
+        prefix = f"{position:03d}. " if isinstance(position, int) else ""
+        lines.append(f"{prefix}{query} - target: {target_quality}; fallback: {fallback_quality} ({reason})")
+    if len(searches) > 20:
+        lines.append(f"...and {len(searches) - 20} more.")
+    return "\n".join(lines)
 
 
 async def ask_choice(bot, channel, author, prompt, choices, timeout=45):
@@ -458,9 +537,44 @@ class Music(commands.Cog, name="music"):
                     media_type="track",
                 )
                 if failed_searches:
-                    await result_channel.send(
-                        f"{len(failed_searches)} item(s) could not be prepared and were skipped."
+                    gap_list = format_quality_gap_list(failed_searches, quality_label)
+                    choice = await ask_choice(
+                        self.bot,
+                        result_channel,
+                        ctx.author,
+                        (
+                            f"**{len(failed_searches)} playlist item(s)** could not be matched at **{quality_label}**.\n"
+                            "The other playlist items will stay at the highest matched quality.\n"
+                            "These item(s) can be filled at **Standard quality**:\n"
+                            f"```text\n{gap_list}\n```\n"
+                            "Proceed with best available quality for the whole playlist, or cancel the request?"
+                        ),
+                        {"proceed", "cancel"},
+                        timeout=120,
                     )
+                    if choice == "cancel":
+                        return
+                    await progress.set("Filling unavailable items", force=True)
+                    still_failed = await download_standard_searches(
+                        failed_searches,
+                        temp_path,
+                        download_log_path,
+                        progress,
+                    )
+                    if still_failed:
+                        unresolved = format_quality_gap_list(
+                            still_failed,
+                            "Standard quality",
+                            fallback_quality="Unavailable",
+                        )
+                        await result_channel.send(
+                            f"{len(still_failed)} item(s) still could not be downloaded and will be skipped:\n"
+                            f"```text\n{unresolved}\n```"
+                        )
+                    else:
+                        await result_channel.send(
+                            "All lower-availability playlist item(s) were filled at **Standard quality**."
+                        )
             else:
                 command, _, download_status, process_env = command_for(link, temp_path, qobuz_quality, qobuz_search)
                 await progress.set(download_status, force=True)
