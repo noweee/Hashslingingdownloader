@@ -116,7 +116,7 @@ def spotify_api_args():
 
 async def spotify_to_qobuz_search(link, temp_path, log_path):
     metadata_path = Path(temp_path) / "spotify_metadata.spotdl"
-    returncode = await run_logged_command(
+    commands = [
         [
             sys.executable,
             "-m",
@@ -126,16 +126,60 @@ async def spotify_to_qobuz_search(link, temp_path, log_path):
             "--save-file",
             str(metadata_path),
             *spotify_api_args(),
-        ],
-        log_path,
-        append=True,
-        header=f"[spotify] Saving metadata for {link}",
-    )
+        ]
+    ]
+    if spotify_api_args():
+        commands.append(
+            [
+                sys.executable,
+                "-m",
+                "spotdl",
+                "save",
+                link,
+                "--save-file",
+                str(metadata_path),
+            ]
+        )
+
+    returncode = 1
+    for index, command in enumerate(commands, start=1):
+        if metadata_path.exists():
+            metadata_path.unlink()
+        returncode = await run_logged_command(
+            command,
+            log_path,
+            append=True,
+            header=f"[spotify] Saving metadata attempt {index}/{len(commands)} for {link}",
+        )
+        if returncode == 0 and metadata_path.is_file():
+            break
+
     if returncode != 0 or not metadata_path.is_file():
+        with Path(log_path).open("a", encoding="utf-8", errors="ignore") as log_file:
+            log_file.write(f"[spotify] metadata failed with exit code {returncode}\n")
         return None
     try:
-        items = json.loads(metadata_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+        raw_items = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        with Path(log_path).open("a", encoding="utf-8", errors="ignore") as log_file:
+            log_file.write(f"[spotify] metadata JSON parse failed: {exc}\n")
+        return None
+    if isinstance(raw_items, dict):
+        raw_items = (
+            raw_items.get("songs")
+            or raw_items.get("tracks")
+            or raw_items.get("items")
+            or raw_items.get("results")
+            or []
+        )
+    if not isinstance(raw_items, list):
+        with Path(log_path).open("a", encoding="utf-8", errors="ignore") as log_file:
+            log_file.write(f"[spotify] metadata had unsupported shape: {type(raw_items).__name__}\n")
+        return None
+    items = [item for item in raw_items if isinstance(item, dict)]
+    if not items:
+        with Path(log_path).open("a", encoding="utf-8", errors="ignore") as log_file:
+            log_file.write("[spotify] metadata did not contain any track rows\n")
         return None
     media_type = spotify_media_type(link)
     if media_type in {"album", "playlist"}:
