@@ -112,6 +112,9 @@ def command_for(link, temp_path, qobuz_quality, qobuz_search=None):
             "--preload",
             "--sponsor-block",
             "--print-errors",
+            "--log-level",
+            "DEBUG",
+            "--simple-tui",
             "--format",
             "m4a",
             *spotify_api_args(),
@@ -468,8 +471,10 @@ class Music(commands.Cog, name="music"):
                     env=process_env,
                     progress_callback=lambda percent: progress.percent("Downloading", percent),
                     append=True,
-                    header="[download] spotdl",
+                    header="[download] " + " ".join(str(part) for part in command),
                 )
+                with download_log_path.open("a", encoding="utf-8", errors="ignore") as log_file:
+                    log_file.write(f"\n[download] exit code: {returncode}\n")
                 if returncode != 0:
                     raise RuntimeError(f"downloader failed with exit code {returncode}")
             download_time = timedelta(seconds=round(time.time() - download_start_time))
@@ -485,6 +490,8 @@ class Music(commands.Cog, name="music"):
                     if path.is_file()
                 ]
                 details = ", ".join(found_files[:8]) if found_files else "request folder was empty"
+                with download_log_path.open("a", encoding="utf-8", errors="ignore") as log_file:
+                    log_file.write(f"[download] no audio files found. Files found: {details}\n")
                 raise RuntimeError(f"No audio files were downloaded. Files found: {details}")
             if tier.max_batch_tracks is not None and song_count > tier.max_batch_tracks:
                 await result_channel.send(
