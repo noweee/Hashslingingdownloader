@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -99,10 +100,33 @@ def spotify_track_queries(items):
     return queries
 
 
+def spotify_api_args():
+    client_id = os.getenv("SPOTIFY_CLIENT_ID") or os.getenv("SPOTDL_CLIENT_ID")
+    client_secret = os.getenv("SPOTIFY_CLIENT_SECRET") or os.getenv("SPOTDL_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        return []
+    return [
+        "--use-official-api",
+        "--client-id",
+        client_id,
+        "--client-secret",
+        client_secret,
+    ]
+
+
 async def spotify_to_qobuz_search(link, temp_path, log_path):
     metadata_path = Path(temp_path) / "spotify_metadata.spotdl"
     returncode = await run_logged_command(
-        [sys.executable, "-m", "spotdl", "save", link, "--save-file", str(metadata_path)],
+        [
+            sys.executable,
+            "-m",
+            "spotdl",
+            "save",
+            link,
+            "--save-file",
+            str(metadata_path),
+            *spotify_api_args(),
+        ],
         log_path,
         append=True,
         header=f"[spotify] Saving metadata for {link}",

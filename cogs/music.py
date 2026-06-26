@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import os
 import random
 import subprocess
 import time
@@ -61,6 +62,20 @@ def service_kind(link):
     return "unsupported"
 
 
+def spotify_api_args():
+    client_id = os.getenv("SPOTIFY_CLIENT_ID") or os.getenv("SPOTDL_CLIENT_ID")
+    client_secret = os.getenv("SPOTIFY_CLIENT_SECRET") or os.getenv("SPOTDL_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        return []
+    return [
+        "--use-official-api",
+        "--client-id",
+        client_id,
+        "--client-secret",
+        client_secret,
+    ]
+
+
 def content_kind(link):
     lowered = link.lower()
     if any(name in lowered for name in ["album", "playlist"]):
@@ -99,6 +114,7 @@ def command_for(link, temp_path, qobuz_quality, qobuz_search=None):
             "--print-errors",
             "--format",
             "m4a",
+            *spotify_api_args(),
         ], "download_log.txt", "Downloading...", None
     streamrip_env = make_request_streamrip_env(temp_path, qobuz_quality)
     return [tool_command("rip"), "--quality", str(qobuz_quality), "url", link], "download_log.txt", "Downloading...", streamrip_env
