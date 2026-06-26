@@ -138,16 +138,18 @@ async def spotify_to_qobuz_search(link, temp_path, log_path):
     except json.JSONDecodeError:
         return None
     media_type = spotify_media_type(link)
-    if media_type == "playlist":
+    if media_type in {"album", "playlist"}:
         searches = spotify_track_queries(items)
         if not searches:
             return None
         first = items[0] if items else {}
-        playlist_name = _first_text(first.get("list_name"))
-        playlist_name = playlist_name or _first_text(first.get("playlist"))
-        playlist_name = playlist_name or _first_text(first.get("playlist_title"))
-        playlist_name = playlist_name or _first_text(first.get("title"))
-        return "tracks", searches, max(1, len(searches)), playlist_name
+        collection_name = _first_text(first.get("list_name"))
+        collection_name = collection_name or _first_text(first.get("playlist"))
+        collection_name = collection_name or _first_text(first.get("playlist_title"))
+        collection_name = collection_name or _first_text(first.get("album_name"))
+        collection_name = collection_name or _first_text(first.get("album"))
+        collection_name = collection_name or _first_text(first.get("title"))
+        return "tracks", searches, max(1, len(searches)), collection_name
     query = spotify_query_from_items(items, media_type)
     if not query:
         return None

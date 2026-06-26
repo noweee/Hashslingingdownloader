@@ -484,6 +484,12 @@ class Music(commands.Cog, name="music"):
                         source_note = f"Request matched as **{media_type}: {query}**."
                     await result_channel.send(f"{ctx.author.mention} {source_note}")
                 else:
+                    if content == "batch":
+                        await result_channel.send(
+                            f"{ctx.author.mention} I could not read this playlist/album track list, so I cannot compare item-by-item quality. "
+                            "Please try again or send a different link."
+                        )
+                        return
                     choice = await ask_choice(
                         self.bot,
                         result_channel,
