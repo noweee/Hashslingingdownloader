@@ -93,7 +93,7 @@ def command_for(link, temp_path, qobuz_quality, qobuz_search=None):
             "download",
             link,
             "--output",
-            str(temp_path),
+            str(Path(temp_path) / "{artists} - {title}.{output-ext}"),
             "--preload",
             "--sponsor-block",
             "--print-errors",
@@ -463,7 +463,13 @@ class Music(commands.Cog, name="music"):
             detected_quality = detect_audio_quality(temp_path)
             song_count = count_audio_files(temp_path)
             if song_count < 1:
-                raise RuntimeError("No audio files were downloaded.")
+                found_files = [
+                    str(path.relative_to(temp_path))
+                    for path in sorted(temp_path.rglob("*"))
+                    if path.is_file()
+                ]
+                details = ", ".join(found_files[:8]) if found_files else "request folder was empty"
+                raise RuntimeError(f"No audio files were downloaded. Files found: {details}")
             if tier.max_batch_tracks is not None and song_count > tier.max_batch_tracks:
                 await result_channel.send(
                     f"{ctx.author.mention}, your **{tier.label}** allows up to **{tier.max_batch_tracks}** song(s) per request. "
