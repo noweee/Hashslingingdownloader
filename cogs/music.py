@@ -87,9 +87,7 @@ def command_for(link, temp_path, qobuz_quality, qobuz_search=None):
         ], "download_log.txt", "Downloading...", streamrip_env
     if kind == "spotify":
         return [
-            sys.executable,
-            "-m",
-            "spotdl",
+            tool_command("spotdl"),
             "download",
             link,
             "--output",
