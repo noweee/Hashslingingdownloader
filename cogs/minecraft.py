@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands, tasks
 
+from helpers.admin import is_admin_channel, send_admin_output
 from helpers.config import load_config
 from helpers.minecraft_status import format_system_uptime, query_minecraft_status
 
@@ -43,10 +44,15 @@ class Minecraft(commands.Cog, name="minecraft"):
         await self.bot.wait_until_ready()
 
     @commands.command(name="mc", aliases=["minecraft", "server"])
+    @commands.has_any_role("Dev and Maintainer", "Founders")
     async def minecraft(self, context):
         """
         Show Minecraft server status and server power-on time.
         """
+        if not is_admin_channel(context.channel):
+            await context.reply("Use this command in #admin-commands-hsd.")
+            return
+
         async with context.typing():
             status = await query_minecraft_status(self.host, self.port)
             uptime = format_system_uptime()
@@ -72,7 +78,7 @@ class Minecraft(commands.Cog, name="minecraft"):
         if status.error:
             embed.add_field(name="Check result", value=status.error[:1000], inline=False)
         embed.set_footer(text=f"Requested by {context.message.author}")
-        await context.reply(embed=embed)
+        await send_admin_output(context, embed=embed)
 
 
 async def setup(bot):

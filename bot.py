@@ -56,7 +56,11 @@ async def on_message(message):
     if message.guild and message.channel.id == config.get("request_channel"):
         prefix = str(config.get("bot_prefix", "h!")).lower()
         content = (message.content or "").strip().lower()
-        allowed = content.startswith(f"{prefix}dl")
+        admin_commands = ("mc", "minecraft", "server", "ping", "clean", "cleanlogs", "hardreset", "purgegd")
+        allowed = content.startswith(f"{prefix}dl") or any(
+            content == f"{prefix}{name}" or content.startswith(f"{prefix}{name} ")
+            for name in admin_commands
+        )
         if not allowed:
             try:
                 await message.delete()
