@@ -19,8 +19,9 @@ You want Java version `21`.
 ## 2. Create A Server Folder
 
 ```bash
-mkdir -p ~/minecraft-server
-cd ~/minecraft-server
+sudo mkdir -p /srv/server/minecraft
+sudo chown -R $USER:$USER /srv/server/minecraft
+cd /srv/server/minecraft
 ```
 
 ## 3. Download Paper
@@ -34,7 +35,7 @@ https://papermc.io/downloads/paper
 Put it in:
 
 ```text
-~/minecraft-server/paper.jar
+/srv/server/minecraft/paper.jar
 ```
 
 ## 4. Accept The EULA
@@ -55,7 +56,7 @@ Paste:
 
 ```bash
 #!/usr/bin/env bash
-cd "$HOME/minecraft-server"
+cd /srv/server/minecraft
 java -Xms1G -Xmx4G -jar paper.jar nogui
 ```
 
@@ -68,7 +69,7 @@ chmod +x start.sh
 ## 6. Start The Server
 
 ```bash
-cd ~/minecraft-server
+cd /srv/server/minecraft
 screen -S minecraft ./start.sh
 ```
 
@@ -92,18 +93,36 @@ Stop the server safely from inside the console:
 stop
 ```
 
-## 7. Configure The Discord Bot Check
+## 7. Create The Discord Status Config
 
-In the bot's `.env` file on the same Ubuntu server:
+Keep the Minecraft status settings in the Minecraft folder:
 
-```env
-MINECRAFT_HOST=127.0.0.1
-MINECRAFT_PORT=25565
-MINECRAFT_NAME=SBPH Minecraft
-MINECRAFT_STATUS_INTERVAL=60
+```bash
+nano /srv/server/minecraft/discord-status.json
 ```
 
-Restart the Discord bot after editing `.env`.
+Paste:
+
+```json
+{
+  "host": "127.0.0.1",
+  "port": 25565,
+  "name": "Hash Slinging Server",
+  "status_interval": 60
+}
+```
+
+The Discord bot reads this file from `/srv/server/minecraft`, so the Minecraft-specific settings stay with the Minecraft server.
+
+If you ever move this file somewhere else, set this one bot `.env` value:
+
+```env
+MINECRAFT_STATUS_CONFIG=/srv/server/minecraft/discord-status.json
+```
+
+Otherwise, you do not need to add Minecraft host, port, or name to the bot `.env`.
+
+Restart the Discord bot after editing `discord-status.json`.
 
 ## 8. Test In Discord
 

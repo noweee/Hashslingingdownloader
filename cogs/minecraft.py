@@ -13,7 +13,7 @@ class Minecraft(commands.Cog, name="minecraft"):
         self.bot = bot
         self.host = config.get("minecraft_host", "127.0.0.1")
         self.port = config.get("minecraft_port", 25565)
-        self.name = config.get("minecraft_name", "Minecraft Server")
+        self.name = config.get("minecraft_name", "Hash Slinging Server")
         self.status_interval = config.get("minecraft_status_interval", 60)
         self.update_presence.change_interval(seconds=self.status_interval)
         self.update_presence.start()

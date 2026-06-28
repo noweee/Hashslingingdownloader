@@ -13,10 +13,7 @@
   "rclone_upload_path": "",
   "shrinkearn_api_key": "",
   "shrinkearn_api_url": "https://shrinkearn.com/api",
-  "minecraft_host": "127.0.0.1",
-  "minecraft_port": 25565,
-  "minecraft_name": "Minecraft Server",
-  "minecraft_status_interval": 60,
+  "minecraft_status_config": "/srv/server/minecraft/discord-status.json",
   "owners": [
     380793772088229888,
     380793772088229888

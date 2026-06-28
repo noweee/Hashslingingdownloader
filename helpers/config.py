@@ -1,6 +1,6 @@
-import json
 import os
 from pathlib import Path
+import json
 
 
 def _as_int(value, name, required=False):
@@ -24,6 +24,41 @@ def _as_positive_int(value, name, default):
     if parsed <= 0:
         raise ValueError(f"{name} must be greater than 0")
     return parsed
+
+
+def _load_minecraft_config(base_config):
+    default_path = "/srv/server/minecraft/discord-status.json"
+    config_path = Path(os.getenv("MINECRAFT_STATUS_CONFIG", base_config.get("minecraft_status_config", default_path)))
+    minecraft_config = {}
+
+    if config_path.is_file():
+        with config_path.open(encoding="utf-8") as file:
+            minecraft_config = json.load(file)
+
+    return {
+        "minecraft_status_config": str(config_path),
+        "minecraft_host": os.getenv(
+            "MINECRAFT_HOST",
+            minecraft_config.get("host", base_config.get("minecraft_host", "127.0.0.1")),
+        ).strip(),
+        "minecraft_port": _as_positive_int(
+            os.getenv("MINECRAFT_PORT", minecraft_config.get("port", base_config.get("minecraft_port", 25565))),
+            "minecraft_port",
+            25565,
+        ),
+        "minecraft_name": os.getenv(
+            "MINECRAFT_NAME",
+            minecraft_config.get("name", base_config.get("minecraft_name", "Hash Slinging Server")),
+        ).strip(),
+        "minecraft_status_interval": _as_positive_int(
+            os.getenv(
+                "MINECRAFT_STATUS_INTERVAL",
+                minecraft_config.get("status_interval", base_config.get("minecraft_status_interval", 60)),
+            ),
+            "minecraft_status_interval",
+            60,
+        ),
+    }
 
 
 def load_config():
@@ -62,18 +97,7 @@ def load_config():
     config["rclone_upload_path"] = os.getenv("RCLONE_UPLOAD_PATH", config.get("rclone_upload_path", "")).strip("/")
     config["shrinkearn_api_key"] = os.getenv("SHRINKEARN_API_KEY", config.get("shrinkearn_api_key", "")).strip()
     config["shrinkearn_api_url"] = os.getenv("SHRINKEARN_API_URL", config.get("shrinkearn_api_url", "https://shrinkearn.com/api")).strip()
-    config["minecraft_host"] = os.getenv("MINECRAFT_HOST", config.get("minecraft_host", "127.0.0.1")).strip()
-    config["minecraft_port"] = _as_positive_int(
-        os.getenv("MINECRAFT_PORT", config.get("minecraft_port", 25565)),
-        "minecraft_port",
-        25565,
-    )
-    config["minecraft_name"] = os.getenv("MINECRAFT_NAME", config.get("minecraft_name", "Minecraft Server")).strip()
-    config["minecraft_status_interval"] = _as_positive_int(
-        os.getenv("MINECRAFT_STATUS_INTERVAL", config.get("minecraft_status_interval", 60)),
-        "minecraft_status_interval",
-        60,
-    )
+    config.update(_load_minecraft_config(config))
 
     if not config["token"]:
         raise ValueError("Discord bot token is missing. Set DISCORD_BOT_TOKEN or config.json token.")
