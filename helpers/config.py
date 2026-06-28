@@ -14,6 +14,18 @@ def _as_int(value, name, required=False):
         raise ValueError(f"{name} must be a Discord numeric ID") from exc
 
 
+def _as_positive_int(value, name, default):
+    if value in (None, ""):
+        return default
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be a number") from exc
+    if parsed <= 0:
+        raise ValueError(f"{name} must be greater than 0")
+    return parsed
+
+
 def load_config():
     config_path = Path("config.json")
     if not config_path.is_file():
@@ -50,6 +62,18 @@ def load_config():
     config["rclone_upload_path"] = os.getenv("RCLONE_UPLOAD_PATH", config.get("rclone_upload_path", "")).strip("/")
     config["shrinkearn_api_key"] = os.getenv("SHRINKEARN_API_KEY", config.get("shrinkearn_api_key", "")).strip()
     config["shrinkearn_api_url"] = os.getenv("SHRINKEARN_API_URL", config.get("shrinkearn_api_url", "https://shrinkearn.com/api")).strip()
+    config["minecraft_host"] = os.getenv("MINECRAFT_HOST", config.get("minecraft_host", "127.0.0.1")).strip()
+    config["minecraft_port"] = _as_positive_int(
+        os.getenv("MINECRAFT_PORT", config.get("minecraft_port", 25565)),
+        "minecraft_port",
+        25565,
+    )
+    config["minecraft_name"] = os.getenv("MINECRAFT_NAME", config.get("minecraft_name", "Minecraft Server")).strip()
+    config["minecraft_status_interval"] = _as_positive_int(
+        os.getenv("MINECRAFT_STATUS_INTERVAL", config.get("minecraft_status_interval", 60)),
+        "minecraft_status_interval",
+        60,
+    )
 
     if not config["token"]:
         raise ValueError("Discord bot token is missing. Set DISCORD_BOT_TOKEN or config.json token.")
