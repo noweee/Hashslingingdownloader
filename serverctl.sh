@@ -45,10 +45,6 @@ require_screen() {
 
 start_bot() {
     require_screen
-    if screen_exists "$BOT_SCREEN"; then
-        echo "Bot is already running in screen: $BOT_SCREEN"
-        return
-    fi
     if [ ! -d "$BOT_DIR" ]; then
         echo "Bot folder not found: $BOT_DIR"
         exit 1
@@ -62,6 +58,8 @@ start_bot() {
         exit 1
     fi
 
+    stop_bot
+    sleep 1
     screen -dmS "$BOT_SCREEN" bash -lc "cd '$BOT_DIR' && set -a && source .env && set +a && source .venv/bin/activate && python bot.py"
     echo "Started bot in screen: $BOT_SCREEN"
 }
@@ -77,6 +75,8 @@ stop_bot() {
     fi
 
     pkill -f "$BOT_DIR/bot.py" >/dev/null 2>&1 || true
+    pkill -f "$BOT_DIR/.venv/bin/python $BOT_DIR/bot.py" >/dev/null 2>&1 || true
+    pkill -f "python bot.py" >/dev/null 2>&1 || true
 }
 
 restart_bot() {
